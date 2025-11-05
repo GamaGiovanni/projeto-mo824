@@ -1,0 +1,6 @@
+src/metaheuristics/ga/AbstractGA.java
+src/problems/Evaluator.java
+src/problems/mkp/solvers/GA_MKP.java
+src/problems/mkp/solvers/ISGA_MKP.java
+src/problems/mkp/MKP_ORLib.java
+src/solutions/Solution.java
