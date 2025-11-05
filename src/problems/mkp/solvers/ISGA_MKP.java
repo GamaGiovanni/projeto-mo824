@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import metaheuristics.ga.AbstractGA;
 import problems.Evaluator;
 import solutions.Solution;
 
