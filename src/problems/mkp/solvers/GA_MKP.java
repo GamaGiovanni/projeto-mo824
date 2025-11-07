@@ -145,49 +145,157 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 
     // ---------------- Runner de conveniência ----------------
     public static void main(String[] args) throws Exception {
-        // Exemplo de uso:
-        // java problems.mkp.solvers.GA_MKP <path_orlib> <instanceIndex> <generations> <popSize> <mutationRate> <useRepair:true/false> [lambda]
-        String path = (args.length >= 1) ? args[0] : "instances/mkp/mknapcb1.txt";
-        int inst = (args.length >= 2) ? Integer.parseInt(args[1]) : 1;
-        int generations = (args.length >= 3) ? Integer.parseInt(args[2]) : 500;
-        int popSize = (args.length >= 4) ? Integer.parseInt(args[3]) : 100;
-        double mut = (args.length >= 5) ? Double.parseDouble(args[4]) : 0.02;
-        boolean repair = (args.length >= 6) ? Boolean.parseBoolean(args[5]) : true;
+        // Ex.: 
+        //  Baseline:
+        //  java problems.mkp.solvers.GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true
+        //
+        //  Com TS:
+        //  java problems.mkp.solvers.GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true \
+        //       --ts true --tenure 7 --ts-steps 500 --vmin 0.0 --vmax 100.0 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9
 
-        MKP_ORLib evaluator =
-            (args.length >= 7)
-                ? new MKP_ORLib(path, inst, Double.parseDouble(args[6]))
-                : new MKP_ORLib(path, inst); // lambda automático
+        if (hasFlag(args, "--help") || hasFlag(args, "-h")) {
+            printHelp();
+            return;
+        }
+
+        java.util.Map<String,String> cli = parseArgsToMap(args);
+
+        // --- parâmetros do GA (com defaults) ---
+        String path = cli.getOrDefault("path", "instances/mkp/mknapcb1.txt");
+
+        int inst = getInt(cli, new String[]{"instance","inst"}, 1);
+        int generations = getInt(cli, new String[]{"generations","gens"}, 500);
+        int popSize = getInt(cli, new String[]{"pop","popSize"}, 100);
+        double mut = getDouble(cli, new String[]{"mutation","mut"}, 0.02);
+        boolean repair = getBool(cli, new String[]{"repair"}, true);
+
+        // lambda opcional: se fornecido usa fixo; senão, MKP_ORLib com lambda automático
+        Double lambdaFixed = getNullableDouble(cli, new String[]{"lambda","lam","lmb"});
+        MKP_ORLib evaluator = (lambdaFixed != null)
+                ? new MKP_ORLib(path, inst, lambdaFixed)
+                : new MKP_ORLib(path, inst);
 
         GA_MKP ga = new GA_MKP(evaluator, generations, popSize, mut, repair);
 
-    // Optional TS flags:
-    // --ts <tenure> <steps> <vmin> <vmax> <lmbMin> <lmbMax> <upFactor> <downFactor>
-    for (int ai = 7; ai < args.length; ai++) {
-        if ("--ts".equalsIgnoreCase(args[ai]) && (ai + 8) < args.length) {
-            int tenure = Integer.parseInt(args[ai+1]);
-            int steps  = Integer.parseInt(args[ai+2]);
-            double vmin = Double.parseDouble(args[ai+3]);
-            double vmax = Double.parseDouble(args[ai+4]);
-            double lmbMin = Double.parseDouble(args[ai+5]);
-            double lmbMax = Double.parseDouble(args[ai+6]);
-            double up = Double.parseDouble(args[ai+7]);
-            double down = Double.parseDouble(args[ai+8]);
-            ai += 8;
+        // --- Tabu Search + Strategic Oscillation (opcional) ---
+        boolean tsOn = getBool(cli, new String[]{"ts"}, false)
+                || hasAny(cli, "tenure","ts-steps","vmin","vmax","lmbMin","lmbMax","up","down");
 
-            problems.mkp.TabuSO_MKP ts = new problems.mkp.TabuSO_MKP(evaluator,
-                    tenure, lmbMin, lmbMax, up, down, vmin, vmax);
+        if (tsOn) {
+            int tenure = getInt(cli, new String[]{"tenure"}, 7);
+            int tsSteps = getInt(cli, new String[]{"ts-steps","steps"}, 500);
+            double vmin = getDouble(cli, new String[]{"vmin"}, 0.0);
+            double vmax = getDouble(cli, new String[]{"vmax"}, 100.0);
+            double lmbMin = getDouble(cli, new String[]{"lmbMin"}, 0.1);
+            double lmbMax = getDouble(cli, new String[]{"lmbMax"}, 10000.0);
+            double up = getDouble(cli, new String[]{"up"}, 1.2);
+            double down = getDouble(cli, new String[]{"down"}, 0.9);
+
+            // Instancia o TS+SO para MKP (pacote ls)
+            problems.mkp.TabuSO_MKP ts = new problems.mkp.TabuSO_MKP(
+                    evaluator, tenure, lmbMin, lmbMax, up, down, vmin, vmax);
+
+            // conecta como "improver" no GA
             ga.setImprover(ts);
-            // store steps in a field if needed; here we keep 500 default inside applyImprovement
+
+            // se quiser usar tsSteps dentro do GA na sua aplicação (por ex. passar para applyImprovement),
+            // você pode guardar em um campo da classe GA_MKP; aqui mantemos o default interno.
+            // ex.: ga.setLocalSearchSteps(tsSteps);
+        }
+
+        solutions.Solution<Integer> best = ga.solve();
+        // saída mínima
+        System.out.println(best.cost);
+    }
+
+    /* ====================== Helpers simples de CLI ====================== */
+
+    protected static java.util.Map<String,String> parseArgsToMap(String[] args) {
+        java.util.Map<String,String> map = new java.util.HashMap<>();
+        for (int i = 0; i < args.length; i++) {
+            String a = args[i];
+            if (!a.startsWith("--")) continue;
+
+            // --chave=valor
+            int eq = a.indexOf('=');
+            if (eq > 2) {
+                String k = a.substring(2, eq).trim();
+                String v = a.substring(eq + 1).trim();
+                map.put(k, v);
+                continue;
+            }
+
+            // --chave valor (se houver próximo token que não é outra flag)
+            String k = a.substring(2).trim();
+            String v = "true"; // valor padrão para flags booleanas "secas"
+            if ((i + 1) < args.length && !args[i + 1].startsWith("--")) {
+                v = args[++i].trim();
+            }
+            map.put(k, v);
+        }
+        return map;
+    }
+
+    protected static boolean hasFlag(String[] args, String flag) {
+        for (String a : args) if (a.equals(flag)) return true;
+        return false;
+    }
+
+    protected static boolean hasAny(java.util.Map<String,String> m, String... keys) {
+        for (String k : keys) if (m.containsKey(k)) return true;
+        return false;
+    }
+
+    protected static int getInt(java.util.Map<String,String> m, String[] keys, int def) {
+        for (String k : keys) if (m.containsKey(k)) return Integer.parseInt(m.get(k));
+        return def;
+    }
+    protected static double getDouble(java.util.Map<String,String> m, String[] keys, double def) {
+        for (String k : keys) if (m.containsKey(k)) return Double.parseDouble(m.get(k));
+        return def;
+    }
+    protected static Boolean getBool(java.util.Map<String,String> m, String[] keys, Boolean def) {
+        for (String k : keys) if (m.containsKey(k)) return parseBool(m.get(k), def);
+        return def;
+    }
+    protected static Double getNullableDouble(java.util.Map<String,String> m, String[] keys) {
+        for (String k : keys) if (m.containsKey(k)) return Double.parseDouble(m.get(k));
+        return null;
+    }
+    protected static Boolean parseBool(String s, Boolean def) {
+        if (s == null) return def;
+        switch (s.toLowerCase()) {
+            case "1": case "true": case "yes": case "y": case "on": return true;
+            case "0": case "false": case "no": case "n": case "off": return false;
+            default: return def;
         }
     }
 
-        Solution<Integer> best = ga.solve();
-        System.out.println("Best (cost=" + best.cost + "): " + best);
-        if (evaluator.optimalFromFile != null && evaluator.optimalFromFile > 0) {
-            System.out.println("Opt (file) = " + evaluator.optimalFromFile);
-        }
+    protected static void printHelp() {
+        System.out.println("Uso (parâmetros nomeados em qualquer ordem):");
+        System.out.println("  --path <arquivo OR-Library>    (default: instances/mkp/mknapcb1.txt)");
+        System.out.println("  --instance <id>                (default: 1)");
+        System.out.println("  --generations|--gens <n>       (default: 500)");
+        System.out.println("  --pop|--popSize <n>            (default: 100)");
+        System.out.println("  --mutation|--mut <p>           (default: 0.02)");
+        System.out.println("  --repair <true/false>          (default: true)");
+        System.out.println("  --lambda <val>                 (opcional; se não passar, usa lambda automático)");
+        System.out.println();
+        System.out.println("  --ts <true/false>              (ativa TS+SO; se omitir mas passar algum parâmetro de TS, ativa também)");
+        System.out.println("  --tenure <n>                   (default: 7)");
+        System.out.println("  --ts-steps|--steps <n>         (default: 500)");
+        System.out.println("  --vmin <val>                   (default: 0.0)");
+        System.out.println("  --vmax <val>                   (default: 100.0)");
+        System.out.println("  --lmbMin <val>                 (default: 0.1)");
+        System.out.println("  --lmbMax <val>                 (default: 10000.0)");
+        System.out.println("  --up <fator>                   (default: 1.2)");
+        System.out.println("  --down <fator>                 (default: 0.9)");
+        System.out.println();
+        System.out.println("Exemplos:");
+        System.out.println("  java ...GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true");
+        System.out.println("  java ...GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --gens 500 --pop 100 --mut 0.02 --repair true --ts true --tenure 7 --ts-steps 500 --vmin 0 --vmax 100 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9");
     }
+
 
 
     /** Overridable hook from AbstractGA: apply local improvement to selected individuals. */

@@ -266,54 +266,102 @@ public class KMeansGA_MKP extends GA_MKP {
         return (best != null) ? best : pop.get(indices.get(rng.nextInt(n)));
     }
 
-    // ---------------- Runner de conveniência ----------------
+   // ---------------- Runner com parâmetros nomeados ----------------
     public static void main(String[] args) throws Exception {
-        // java problems.mkp.solvers.KMeansGA_MKP <path_orlib> <instanceIndex> <generations> <popSize> <mutationRate> <useRepair:true/false> [lambda]
-        //                                         [k] [tourn] [maxIter] [bitSample] [clusterEveryG]
-        String path = (args.length >= 1) ? args[0] : "instances/mkp/mknapcb1.txt";
-        int inst = (args.length >= 2) ? Integer.parseInt(args[1]) : 1;
-        int generations = (args.length >= 3) ? Integer.parseInt(args[2]) : 500;
-        int popSize = (args.length >= 4) ? Integer.parseInt(args[3]) : 100;
-        double mut = (args.length >= 5) ? Double.parseDouble(args[4]) : 0.02;
-        boolean repair = (args.length >= 6) ? Boolean.parseBoolean(args[5]) : true;
+        // Exemplos:
+        //  KMeans puro:
+        //  java problems.mkp.solvers.KMeansGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true \
+        //       --k 2 --tourn 3 --maxIter 10 --bitSample 0 --clusterEveryG 1
+        //
+        //  KMeans + TS:
+        //  java problems.mkp.solvers.KMeansGA_MKP --path instances/mkp/mknapcb1.txt --inst 1 --gens 500 --pop 100 --mut 0.02 --repair true \
+        //       --k 2 --tourn 3 --maxIter 10 --bitSample 0 --clusterEveryG 1 \
+        //       --ts true --tenure 7 --ts-steps 500 --vmin 0.0 --vmax 100.0 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9
 
-        MKP_ORLib evaluator =
-            (args.length >= 7)
-                ? new MKP_ORLib(path, inst, Double.parseDouble(args[6]))
-                : new MKP_ORLib(path, inst); // λ automático
-
-        int k = (args.length >= 8) ? Integer.parseInt(args[7]) : 2;
-        int tourn = (args.length >= 9) ? Integer.parseInt(args[8]) : 3;
-        int maxIter = (args.length >= 10) ? Integer.parseInt(args[9]) : 10;
-        int bitSample = (args.length >= 11) ? Integer.parseInt(args[10]) : 0;
-        int clusterEveryG = (args.length >= 12) ? Integer.parseInt(args[11]) : 1;
-
-        KMeansGA_MKP ga = new KMeansGA_MKP(evaluator, generations, popSize, mut, repair,
-                                            k, tourn, maxIter, bitSample, clusterEveryG);
-
-        
-        // Optional TS flags, same as GA_MKP
-        for (int ai = 7; ai < args.length; ai++) {
-            if ("--ts".equalsIgnoreCase(args[ai]) && (ai + 8) < args.length) {
-                int tenure = Integer.parseInt(args[ai+1]);
-                int steps  = Integer.parseInt(args[ai+2]);
-                double vmin = Double.parseDouble(args[ai+3]);
-                double vmax = Double.parseDouble(args[ai+4]);
-                double lmbMin = Double.parseDouble(args[ai+5]);
-                double lmbMax = Double.parseDouble(args[ai+6]);
-                double up = Double.parseDouble(args[ai+7]);
-                double down = Double.parseDouble(args[ai+8]);
-                ai += 8;
-
-                problems.mkp.TabuSO_MKP ts = new problems.mkp.TabuSO_MKP(evaluator,
-                        tenure, lmbMin, lmbMax, up, down, vmin, vmax);
-                ga.setImprover(ts);
-            }
+        if (hasFlag(args, "--help") || hasFlag(args, "-h")) {
+            printHelp();
+            return;
         }
+
+        java.util.Map<String,String> cli = parseArgsToMap(args);
+
+        // --- parâmetros base do GA (mesmos do GA_MKP) ---
+        String path = cli.getOrDefault("path", "instances/mkp/mknapcb1.txt");
+        int inst = getInt(cli, new String[]{"instance","inst"}, 1);
+        int generations = getInt(cli, new String[]{"generations","gens"}, 500);
+        int popSize = getInt(cli, new String[]{"pop","popSize"}, 100);
+        double mut = getDouble(cli, new String[]{"mutation","mut"}, 0.02);
+        boolean repair = getBool(cli, new String[]{"repair"}, true);
+
+        // lambda opcional
+        Double lambdaFixed = getNullableDouble(cli, new String[]{"lambda","lam","lmb"});
+        MKP_ORLib evaluator = (lambdaFixed != null)
+                ? new MKP_ORLib(path, inst, lambdaFixed)
+                : new MKP_ORLib(path, inst);
+
+        // --- parâmetros do k-means GA ---
+        int k = getInt(cli, new String[]{"k"}, 2);
+        int tourn = getInt(cli, new String[]{"tourn"}, 3);
+        int maxIter = getInt(cli, new String[]{"maxIter"}, 10);
+        int bitSample = getInt(cli, new String[]{"bitSample"}, 0);
+        int clusterEveryG = getInt(cli, new String[]{"clusterEveryG"}, 1);
+
+        KMeansGA_MKP ga = new KMeansGA_MKP(
+                evaluator, generations, popSize, mut, repair,
+                k, tourn, maxIter, bitSample, clusterEveryG
+        );
+
+        // --- Tabu Search + Strategic Oscillation (opcional) ---
+        boolean tsOn = getBool(cli, new String[]{"ts"}, false)
+                || hasAny(cli, "tenure","ts-steps","steps","vmin","vmax","lmbMin","lmbMax","up","down");
+        if (tsOn) {
+            int tenure = getInt(cli, new String[]{"tenure"}, 7);
+            int tsSteps = getInt(cli, new String[]{"ts-steps","steps"}, 500); // se quiser usar, crie um setter no GA
+            double vmin = getDouble(cli, new String[]{"vmin"}, 0.0);
+            double vmax = getDouble(cli, new String[]{"vmax"}, 100.0);
+            double lmbMin = getDouble(cli, new String[]{"lmbMin"}, 0.1);
+            double lmbMax = getDouble(cli, new String[]{"lmbMax"}, 10000.0);
+            double up = getDouble(cli, new String[]{"up"}, 1.2);
+            double down = getDouble(cli, new String[]{"down"}, 0.9);
+
+            problems.mkp.TabuSO_MKP ts = new problems.mkp.TabuSO_MKP(
+                    evaluator, tenure, lmbMin, lmbMax, up, down, vmin, vmax);
+            ga.setImprover(ts);
+            // opcional: ga.setLocalSearchSteps(tsSteps);
+        }
+
         Solution<Integer> best = ga.solve();
         System.out.println("Best (cost=" + best.cost + "): " + best);
         if (evaluator.optimalFromFile != null && evaluator.optimalFromFile > 0) {
             System.out.println("Opt (file) = " + evaluator.optimalFromFile);
         }
     }
+
+    protected static void printHelp() {
+        System.out.println("Uso (parâmetros nomeados em qualquer ordem):");
+        System.out.println("  --path <arquivo OR-Library>          (default: instances/mkp/mknapcb1.txt)");
+        System.out.println("  --instance|--inst <id>               (default: 1)");
+        System.out.println("  --generations|--gens <n>             (default: 500)");
+        System.out.println("  --pop|--popSize <n>                  (default: 100)");
+        System.out.println("  --mutation|--mut <p>                 (default: 0.02)");
+        System.out.println("  --repair <true/false>                (default: true)");
+        System.out.println("  --lambda|--lam|--lmb <val>           (opcional; se ausente, lambda automático)");
+        System.out.println();
+        System.out.println("  --k <n>                              (default: 2)");
+        System.out.println("  --tourn <n>                          (default: 3)");
+        System.out.println("  --maxIter <n>                        (default: 10)");
+        System.out.println("  --bitSample <n>                      (default: 0  => usa todos os loci)");
+        System.out.println("  --clusterEveryG <n>                  (default: 1  => clusteriza toda geração)");
+        System.out.println();
+        System.out.println("  --ts <true/false>                    (ativa TS+SO; também ativa se qualquer parâmetro de TS for passado)");
+        System.out.println("  --tenure <n>                         (default: 7)");
+        System.out.println("  --ts-steps|--steps <n>               (default: 500)");
+        System.out.println("  --vmin <val>                         (default: 0.0)");
+        System.out.println("  --vmax <val>                         (default: 100.0)");
+        System.out.println("  --lmbMin <val>                       (default: 0.1)");
+        System.out.println("  --lmbMax <val>                       (default: 10000.0)");
+        System.out.println("  --up <fator>                         (default: 1.2)");
+        System.out.println("  --down <fator>                       (default: 0.9)");
+    }
+
 }
