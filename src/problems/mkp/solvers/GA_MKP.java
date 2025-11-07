@@ -1,13 +1,20 @@
 package problems.mkp.solvers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import problems.Evaluator;
 import problems.mkp.MKP_ORLib;
 import solutions.Solution;
 import metaheuristics.ga.AbstractGA;
+import metaheuristics.ls.LocalImprover;
 
 public class GA_MKP extends AbstractGA<Integer, Integer> {
+
+    /** Optional local improver (e.g., Tabu Search). */
+    protected LocalImprover<Integer> improver = null;
+    public void setImprover(LocalImprover<Integer> improver) { this.improver = improver; }
+
 
     /** Usa rotina de repair guloso (fenótipo), sem alterar o cromossomo. */
     private final boolean useGreedyRepair;
@@ -154,10 +161,74 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 
         GA_MKP ga = new GA_MKP(evaluator, generations, popSize, mut, repair);
 
+    // Optional TS flags:
+    // --ts <tenure> <steps> <vmin> <vmax> <lmbMin> <lmbMax> <upFactor> <downFactor>
+    for (int ai = 7; ai < args.length; ai++) {
+        if ("--ts".equalsIgnoreCase(args[ai]) && (ai + 8) < args.length) {
+            int tenure = Integer.parseInt(args[ai+1]);
+            int steps  = Integer.parseInt(args[ai+2]);
+            double vmin = Double.parseDouble(args[ai+3]);
+            double vmax = Double.parseDouble(args[ai+4]);
+            double lmbMin = Double.parseDouble(args[ai+5]);
+            double lmbMax = Double.parseDouble(args[ai+6]);
+            double up = Double.parseDouble(args[ai+7]);
+            double down = Double.parseDouble(args[ai+8]);
+            ai += 8;
+
+            problems.mkp.TabuSO_MKP ts = new problems.mkp.TabuSO_MKP(evaluator,
+                    tenure, lmbMin, lmbMax, up, down, vmin, vmax);
+            ga.setImprover(ts);
+            // store steps in a field if needed; here we keep 500 default inside applyImprovement
+        }
+    }
+
         Solution<Integer> best = ga.solve();
         System.out.println("Best (cost=" + best.cost + "): " + best);
         if (evaluator.optimalFromFile != null && evaluator.optimalFromFile > 0) {
             System.out.println("Opt (file) = " + evaluator.optimalFromFile);
         }
+    }
+
+
+    /** Overridable hook from AbstractGA: apply local improvement to selected individuals. */
+    @Override
+    protected void postGenerationHook(Population population, int generation) {
+        if (improver == null) return;
+        // improve 1 elite + 1 diverse (if any)
+        Chromosome elite = getBestChromosome(population);
+        applyImprovement(elite);
+
+        Chromosome diverse = getMostDistantFrom(elite, population);
+        if (diverse != null && diverse != elite) applyImprovement(diverse);
+    }
+
+    /** Applies the configured LocalImprover to a chromosome: decode, improve, encode-back. */
+    protected void applyImprovement(Chromosome c) {
+        if (c == null) return;
+        Solution<Integer> s = decode(c);
+        long deadline = 0L; // no strict deadline by default
+        Solution<Integer> s2 = (improver != null) ? improver.improve(s, 500, deadline) : s;
+        if (s2 != null && s2.cost > s.cost) {
+            // encode back into genotype (0/1)
+            for (int i = 0; i < chromosomeSize; i++) c.set(i, 0);
+            for (int idx : s2) c.set(idx, 1);
+        }
+    }
+
+    /** Finds the chromosome with maximum Hamming distance to 'ref'. */
+    protected Chromosome getMostDistantFrom(Chromosome ref, Population pop) {
+        if (ref == null || pop == null || pop.isEmpty()) return null;
+        Chromosome best = null;
+        int bestD = -1;
+        for (Chromosome c : pop) {
+            int d = 0;
+            for (int i = 0; i < chromosomeSize; i++) {
+                int a = (ref.get(i) != null && ref.get(i) != 0) ? 1 : 0;
+                int b = (c.get(i)   != null && c.get(i)   != 0) ? 1 : 0;
+                if (a != b) d++;
+            }
+            if (d > bestD) { bestD = d; best = c; }
+        }
+        return best;
     }
 }

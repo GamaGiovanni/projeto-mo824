@@ -7,6 +7,7 @@ import java.util.List;
 
 import problems.Evaluator;
 import solutions.Solution;
+import metaheuristics.ls.LocalImprover;
 
 /**
  * GA para MKP com Seleção Sexual (ISGA) que preserva o GA baseline original
@@ -153,6 +154,25 @@ public class ISGA_MKP extends GA_MKP {
         int tournM = (args.length >= 11) ? Integer.parseInt(args[10]) : 2;
 
         ISGA_MKP ga = new ISGA_MKP(evaluator, generations, popSize, mut, repair, alpha, kMale, tournF, tournM);
+        
+        // Optional TS flags, same as GA_MKP
+        for (int ai = 7; ai < args.length; ai++) {
+            if ("--ts".equalsIgnoreCase(args[ai]) && (ai + 8) < args.length) {
+                int tenure = Integer.parseInt(args[ai+1]);
+                int steps  = Integer.parseInt(args[ai+2]);
+                double vmin = Double.parseDouble(args[ai+3]);
+                double vmax = Double.parseDouble(args[ai+4]);
+                double lmbMin = Double.parseDouble(args[ai+5]);
+                double lmbMax = Double.parseDouble(args[ai+6]);
+                double up = Double.parseDouble(args[ai+7]);
+                double down = Double.parseDouble(args[ai+8]);
+                ai += 8;
+
+                problems.mkp.TabuSO_MKP ts = new problems.mkp.TabuSO_MKP(evaluator,
+                        tenure, lmbMin, lmbMax, up, down, vmin, vmax);
+                ga.setImprover(ts);
+            }
+        }
         Solution<Integer> best = ga.solve();
         System.out.println("Best (cost=" + best.cost + "): " + best);
         if (evaluator.optimalFromFile != null && evaluator.optimalFromFile > 0) {

@@ -177,7 +177,7 @@ public abstract class AbstractGA<G extends Number, F> {
 			Population newpopulation = selectPopulation(mutants);
 
 			population = newpopulation;
-
+			postGenerationHook(population, g);
 			bestChromosome = getBestChromosome(population);
 
 			if (fitness(bestChromosome) > bestSol.cost) {
@@ -377,6 +377,15 @@ public abstract class AbstractGA<G extends Number, F> {
 		}
 
 		return offsprings;
+	}
+
+	/**
+	 * Optional hook: allows subclasses to modify the population after selection/elitism
+	 * and before updating the generation's best solution (e.g., to run local search / TS).
+	 * Default is no-op.
+	 */
+	protected void postGenerationHook(Population population, int generation) {
+		// no-op by default
 	}
 
 }
