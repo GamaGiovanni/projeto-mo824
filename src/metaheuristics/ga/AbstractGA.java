@@ -2,6 +2,7 @@ package metaheuristics.ga;
 
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import problems.Evaluator;
 import solutions.Solution;
@@ -42,13 +43,8 @@ public abstract class AbstractGA<G extends Number, F> {
 	 */
 	protected Evaluator<F> ObjFunction;
 
-	/**
-	 * maximum number of generations being executed
-	 */
-	protected int generations;
-
-	/**
-	 * the size of the population
+	/** 
+	 * the size of the population 
 	 */
 	protected int popSize;
 
@@ -77,8 +73,29 @@ public abstract class AbstractGA<G extends Number, F> {
 	 */
 	protected Chromosome bestChromosome;
 
+	// Stopping criteria parameters
+
+	/** Tempo máximo de execução (nanos). Default: 30 minutos. */
+	protected long maxRuntimeNanos = TimeUnit.MINUTES.toNanos(30);
+
 	/**
-	 * Creates a new solution which is empty, i.e., does not contain any
+	 * Fator de estagnação: número máximo de iterações sem melhora = stagnationFactor * chromosomeSize.
+	 * Default: 10.
+	 */
+	protected int stagnationFactor = 10;
+
+	/** Setters opcionais para customização (se desejar) */
+	public void setMaxRuntimeMillis(long maxMillis) {
+		this.maxRuntimeNanos = TimeUnit.MILLISECONDS.toNanos(maxMillis);
+	}
+	public void setStagnationFactor(int stagnationFactor) {
+		if (stagnationFactor < 1) stagnationFactor = 1;
+		this.stagnationFactor = stagnationFactor;
+	}
+
+
+    /**
+     * Creates a new solution which is empty, i.e., does not contain any
 	 * candidate solution element.
 	 * 
 	 * @return An empty solution.
@@ -131,28 +148,28 @@ public abstract class AbstractGA<G extends Number, F> {
 	 * 
 	 * @param objFunction
 	 *            The objective function being optimized.
-	 * @param generations
-	 *            Number of generations to be executed.
 	 * @param popSize
 	 *            Population size.
 	 * @param mutationRate
 	 *            The mutation rate.
 	 */
-	public AbstractGA(Evaluator<F> objFunction, Integer generations, Integer popSize, Double mutationRate) {
+	public AbstractGA(Evaluator<F> objFunction, Integer popSize, Double mutationRate) {
 		this.ObjFunction = objFunction;
-		this.generations = generations;
 		this.popSize = popSize;
 		this.chromosomeSize = this.ObjFunction.getDomainSize();
 		this.mutationRate = mutationRate;
 	}
 
 	/**
-	 * The GA mainframe. It starts by initializing a population of chromosomes.
+	 * GA mainframe with NEW stopping criteria:
+	 * - time limit (default 30 minutes), OR
+	 * - stagnation of (stagnationFactor * chromosomeSize) iterations without improvement.
+	 * It starts by initializing a population of chromosomes.
 	 * It then enters a generational loop, in which each generation goes the
 	 * following steps: parent selection, crossover, mutation, population update
 	 * and best solution update.
 	 * 
-	 * @return The best feasible solution obtained throughout all iterations.
+	 * @return The best feasible solution obtained.
 	 */
 	public Solution<F> solve() {
 
@@ -161,31 +178,45 @@ public abstract class AbstractGA<G extends Number, F> {
 
 		bestChromosome = getBestChromosome(population);
 		bestSol = decode(bestChromosome);
-		System.out.println("(Gen. " + 0 + ") BestSol = " + bestSol);
+		if (verbose) System.out.println("(Gen. 0) BestSol = " + bestSol);
 
-		/*
-		 * enters the main loop and repeats until a given number of generations
-		 */
-		for (int g = 1; g <= generations; g++) {
+		// ================== Stopping Criteria ==================
+		final long deadline = System.nanoTime() + maxRuntimeNanos;
+		final int stagnationLimit = Math.max(1, stagnationFactor * chromosomeSize);
+		int noImprovement = 0;
+		int g = 0;
+		// ===============================================================
+
+		/* main loop */
+		while (System.nanoTime() < deadline && noImprovement < stagnationLimit) {
+			g++;
 
 			Population parents = selectParents(population);
-
 			Population offsprings = crossover(parents);
-
 			Population mutants = mutate(offsprings);
-
 			Population newpopulation = selectPopulation(mutants);
 
 			population = newpopulation;
 			postGenerationHook(population, g);
 			bestChromosome = getBestChromosome(population);
 
-			if (fitness(bestChromosome) > bestSol.cost) {
+			double currentBestFit = fitness(bestChromosome);
+			if (currentBestFit > bestSol.cost) {
 				bestSol = decode(bestChromosome);
-				if (verbose)
-					System.out.println("(Gen. " + g + ") BestSol = " + bestSol);
+				noImprovement = 0; // reset estagnação
+				if (verbose) System.out.println("(Gen. " + g + ") BestSol = " + bestSol);
+			} else {
+				noImprovement++;
 			}
-
+		}
+		if (verbose) {
+			System.out.println("Finished after " + g + " generations.");
+			System.out.println("Best solution found: " + bestSol);
+			if(noImprovement >= stagnationLimit) {
+				System.out.println("Stopping criterion: no improvement in " + stagnationLimit + " generations.");
+			} else {
+				System.out.println("Stopping criterion: time limit reached.");
+			}
 		}
 
 		return bestSol;

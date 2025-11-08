@@ -29,7 +29,7 @@ import metaheuristics.ls.LocalImprover;
  *   (vide Thèse2020.pdf). 
  *
  * CLI (mesmos args do GA_MKP; params opcionais no fim):
- *   java -cp out problems.mkp.solvers.KMeansGA_MKP <path_orlib> <instanceIndex> <generations> <popSize> <mutationRate> <useRepair:true/false> [lambda]
+ *   java -cp out problems.mkp.solvers.KMeansGA_MKP <path_orlib> <instanceIndex> <popSize> <mutationRate> <useRepair:true/false> [lambda]
  *                                           [k] [tourn] [maxIter] [bitSample] [clusterEveryG]
  *
  * Defaults:
@@ -49,13 +49,12 @@ public class KMeansGA_MKP extends GA_MKP {
     private int selectParentsCalls = 0;
 
     public KMeansGA_MKP(Evaluator<Integer> objFunction,
-                         Integer generations,
                          Integer popSize,
                          Double mutationRate,
                          boolean useGreedyRepair,
                          int k, int tourn, int maxIter,
                          int bitSample, int clusterEveryG) {
-        super(objFunction, generations, popSize, mutationRate, useGreedyRepair);
+        super(objFunction, popSize, mutationRate, useGreedyRepair);
         this.k = Math.max(2, k);
         this.tourn = Math.max(2, tourn);
         this.maxIter = Math.max(1, maxIter);
@@ -270,7 +269,7 @@ public class KMeansGA_MKP extends GA_MKP {
     public static void main(String[] args) throws Exception {
         // Exemplos:
         //  KMeans puro:
-        //  java problems.mkp.solvers.KMeansGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true \
+        //  java problems.mkp.solvers.KMeansGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true \
         //       --k 2 --tourn 3 --maxIter 10 --bitSample 0 --clusterEveryG 1
         //
         //  KMeans + TS:
@@ -288,7 +287,6 @@ public class KMeansGA_MKP extends GA_MKP {
         // --- parâmetros base do GA (mesmos do GA_MKP) ---
         String path = cli.getOrDefault("path", "instances/mkp/mknapcb1.txt");
         int inst = getInt(cli, new String[]{"instance","inst"}, 1);
-        int generations = getInt(cli, new String[]{"generations","gens"}, 500);
         int popSize = getInt(cli, new String[]{"pop","popSize"}, 100);
         double mut = getDouble(cli, new String[]{"mutation","mut"}, 0.02);
         boolean repair = getBool(cli, new String[]{"repair"}, true);
@@ -307,7 +305,7 @@ public class KMeansGA_MKP extends GA_MKP {
         int clusterEveryG = getInt(cli, new String[]{"clusterEveryG"}, 1);
 
         KMeansGA_MKP ga = new KMeansGA_MKP(
-                evaluator, generations, popSize, mut, repair,
+                evaluator, popSize, mut, repair,
                 k, tourn, maxIter, bitSample, clusterEveryG
         );
 
@@ -341,7 +339,6 @@ public class KMeansGA_MKP extends GA_MKP {
         System.out.println("Uso (parâmetros nomeados em qualquer ordem):");
         System.out.println("  --path <arquivo OR-Library>          (default: instances/mkp/mknapcb1.txt)");
         System.out.println("  --instance|--inst <id>               (default: 1)");
-        System.out.println("  --generations|--gens <n>             (default: 500)");
         System.out.println("  --pop|--popSize <n>                  (default: 100)");
         System.out.println("  --mutation|--mut <p>                 (default: 0.02)");
         System.out.println("  --repair <true/false>                (default: true)");

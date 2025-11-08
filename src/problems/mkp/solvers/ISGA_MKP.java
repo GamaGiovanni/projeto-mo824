@@ -14,7 +14,7 @@ import metaheuristics.ls.LocalImprover;
  * (GA_MKP) e apenas sobrescreve a política de seleção de pais.
  *
  * Uso (mesmos argumentos do GA_MKP; parâmetros opcionais do ISGA ao final):
- *   java problems.mkp.solvers.ISGA_MKP <path_orlib> <instanceIndex> <generations> <popSize> <mutationRate> <useRepair:true/false> [lambda] [alpha] [kMale] [tournF] [tournM]
+ *   java problems.mkp.solvers.ISGA_MKP <path_orlib> <instanceIndex> <popSize> <mutationRate> <useRepair:true/false> [lambda] [alpha] [kMale] [tournF] [tournM]
  * Padrões:
  *   alpha = 0,5 (peso para aptidão vs. dissimilaridade)
  *   kMale = 6   (machos candidatos amostrados por fêmea)
@@ -33,7 +33,6 @@ public class ISGA_MKP extends GA_MKP {
     private final int tournM;
 
     public ISGA_MKP(Evaluator<Integer> objFunction,
-                    Integer generations,
                     Integer popSize,
                     Double mutationRate,
                     boolean useGreedyRepair,
@@ -41,7 +40,7 @@ public class ISGA_MKP extends GA_MKP {
                     int kMale,
                     int tournF,
                     int tournM) {
-        super(objFunction, generations, popSize, mutationRate, useGreedyRepair);
+        super(objFunction, popSize, mutationRate, useGreedyRepair);
         this.alpha = alpha;
         this.kMale = kMale;
         this.tournF = tournF;
@@ -135,11 +134,11 @@ public class ISGA_MKP extends GA_MKP {
     public static void main(String[] args) throws Exception {
         // Exemplos:
         //  Baseline ISGA:
-        //  java problems.mkp.solvers.ISGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true \
+        //  java problems.mkp.solvers.ISGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true \
         //       --alpha 0.5 --kMale 6 --tournF 3 --tournM 2
         //
         //  ISGA + TS:
-        //  java problems.mkp.solvers.ISGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --gens 500 --pop 100 --mut 0.02 --repair true \
+        //  java problems.mkp.solvers.ISGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true \
         //       --alpha 0.5 --kMale 6 --tournF 3 --tournM 2 \
         //       --ts true --tenure 7 --ts-steps 500 --vmin 0.0 --vmax 100.0 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9
 
@@ -153,7 +152,6 @@ public class ISGA_MKP extends GA_MKP {
         // --- parâmetros base do GA (mesmos do GA_MKP) ---
         String path = cli.getOrDefault("path", "instances/mkp/mknapcb1.txt");
         int inst = getInt(cli, new String[]{"instance","inst"}, 1);
-        int generations = getInt(cli, new String[]{"generations","gens"}, 500);
         int popSize = getInt(cli, new String[]{"pop","popSize"}, 100);
         double mut = getDouble(cli, new String[]{"mutation","mut"}, 0.02);
         boolean repair = getBool(cli, new String[]{"repair"}, true);
@@ -170,7 +168,7 @@ public class ISGA_MKP extends GA_MKP {
         int tournF = getInt(cli, new String[]{"tournF","tf","tF"}, 3);
         int tournM = getInt(cli, new String[]{"tournM","tm","tM"}, 2);
 
-        ISGA_MKP ga = new ISGA_MKP(evaluator, generations, popSize, mut, repair, alpha, kMale, tournF, tournM);
+        ISGA_MKP ga = new ISGA_MKP(evaluator, popSize, mut, repair, alpha, kMale, tournF, tournM);
 
         // --- Tabu Search + Strategic Oscillation (opcional) ---
         boolean tsOn = getBool(cli, new String[]{"ts"}, false)
@@ -202,7 +200,6 @@ public class ISGA_MKP extends GA_MKP {
         System.out.println("Uso (parâmetros nomeados em qualquer ordem):");
         System.out.println("  --path <arquivo OR-Library>        (default: instances/mkp/mknapcb1.txt)");
         System.out.println("  --instance|--inst <id>             (default: 1)");
-        System.out.println("  --generations|--gens <n>           (default: 500)");
         System.out.println("  --pop|--popSize <n>                (default: 100)");
         System.out.println("  --mutation|--mut <p>               (default: 0.02)");
         System.out.println("  --repair <true/false>              (default: true)");

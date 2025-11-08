@@ -20,11 +20,10 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
     private final boolean useGreedyRepair;
 
     public GA_MKP(Evaluator<Integer> objFunction,
-                  Integer generations,
                   Integer popSize,
                   Double mutationRate,
                   boolean useGreedyRepair) {
-        super(objFunction, generations, popSize, mutationRate);
+        super(objFunction, popSize, mutationRate);
         this.useGreedyRepair = useGreedyRepair;
     }
 
@@ -147,10 +146,10 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
     public static void main(String[] args) throws Exception {
         // Ex.: 
         //  Baseline:
-        //  java problems.mkp.solvers.GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true
+        //  java problems.mkp.solvers.GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true
         //
         //  Com TS:
-        //  java problems.mkp.solvers.GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true \
+        //  java problems.mkp.solvers.GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true \
         //       --ts true --tenure 7 --ts-steps 500 --vmin 0.0 --vmax 100.0 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9
 
         if (hasFlag(args, "--help") || hasFlag(args, "-h")) {
@@ -164,7 +163,6 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
         String path = cli.getOrDefault("path", "instances/mkp/mknapcb1.txt");
 
         int inst = getInt(cli, new String[]{"instance","inst"}, 1);
-        int generations = getInt(cli, new String[]{"generations","gens"}, 500);
         int popSize = getInt(cli, new String[]{"pop","popSize"}, 100);
         double mut = getDouble(cli, new String[]{"mutation","mut"}, 0.02);
         boolean repair = getBool(cli, new String[]{"repair"}, true);
@@ -175,7 +173,7 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
                 ? new MKP_ORLib(path, inst, lambdaFixed)
                 : new MKP_ORLib(path, inst);
 
-        GA_MKP ga = new GA_MKP(evaluator, generations, popSize, mut, repair);
+        GA_MKP ga = new GA_MKP(evaluator, popSize, mut, repair);
 
         // --- Tabu Search + Strategic Oscillation (opcional) ---
         boolean tsOn = getBool(cli, new String[]{"ts"}, false)
@@ -275,7 +273,6 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
         System.out.println("Uso (parâmetros nomeados em qualquer ordem):");
         System.out.println("  --path <arquivo OR-Library>    (default: instances/mkp/mknapcb1.txt)");
         System.out.println("  --instance <id>                (default: 1)");
-        System.out.println("  --generations|--gens <n>       (default: 500)");
         System.out.println("  --pop|--popSize <n>            (default: 100)");
         System.out.println("  --mutation|--mut <p>           (default: 0.02)");
         System.out.println("  --repair <true/false>          (default: true)");
@@ -292,8 +289,8 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
         System.out.println("  --down <fator>                 (default: 0.9)");
         System.out.println();
         System.out.println("Exemplos:");
-        System.out.println("  java ...GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --generations 500 --pop 100 --mutation 0.02 --repair true");
-        System.out.println("  java ...GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --gens 500 --pop 100 --mut 0.02 --repair true --ts true --tenure 7 --ts-steps 500 --vmin 0 --vmax 100 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9");
+        System.out.println("  java ...GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true");
+        System.out.println("  java ...GA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mut 0.02 --repair true --ts true --tenure 7 --ts-steps 500 --vmin 0 --vmax 100 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9");
     }
 
 
