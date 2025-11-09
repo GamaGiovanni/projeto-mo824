@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ===== Defaults (podem ser sobrescritos por env e/ou CLI) =====
-PATH_ORLIB="${PATH_ORLIB:-../../instances/mkp/mknapcb3.txt}"
+PATH_ORLIB="${PATH_ORLIB:-../../instances/mkp/mknapcb1.txt}"
 CLASS="${CLASS:-problems.mkp.solvers.GA_MKP}"
 CP="${CP:-../../out}"
 
@@ -21,8 +21,8 @@ LMBMAX="${LMBMAX-}"
 UP="${UP-}"
 DOWN="${DOWN-}"
 
-RANGE_START="${RANGE_START:-21}"
-RANGE_END="${RANGE_END:-30}"
+RANGE_START="${RANGE_START:-1}"
+RANGE_END="${RANGE_END:-10}"
 
 # ===== Parse CLI (sobrescreve os defaults acima) =====
 EXTRA_ARGS=()
@@ -97,6 +97,7 @@ if $ts_on; then
 fi
 LOGDIR="${LOGDIR:-runs/${BASENAME}/${suffix}}"
 mkdir -p "$LOGDIR"
+COMMON_ARGS+=( --results-dir "${LOGDIR}" --variant "${suffix}"  --mkcbres "../../instances/mkp/mkcbres.txt" --algo "GA" )
 
 echo "Rodando ${CLASS} para ${PATH_ORLIB} [instâncias ${RANGE_START}-${RANGE_END}]"
 echo "Logs: ${LOGDIR}"

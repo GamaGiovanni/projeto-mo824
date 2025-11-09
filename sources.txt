@@ -6,4 +6,7 @@ src/problems/mkp/solvers/ISGA_MKP.java
 src/problems/mkp/solvers/KMeansGA_MKP.java
 src/problems/mkp/MKP_ORLib.java
 src/problems/mkp/TabuSO_MKP.java
+src/utils/Mkcbres.java
+src/utils/Diversity.java
+src/utils/MetricsLogger.java
 src/solutions/Solution.java

@@ -1,11 +1,13 @@
 package metaheuristics.ga;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import problems.Evaluator;
 import solutions.Solution;
+import utils.MetricsLogger;
 
 /**
  * Abstract class for metaheuristic GA (Genetic Algorithms). It consider the
@@ -160,6 +162,37 @@ public abstract class AbstractGA<G extends Number, F> {
 		this.mutationRate = mutationRate;
 	}
 
+	// ====== Metadados e métricas de execução ======
+	protected double bestKnown = Double.NaN;   // BK (melhor conhecido)
+	protected double ubLP = Double.NaN;        // limitante LP (superior)
+	protected String datasetId = "";           // ex.: "ORLIB"
+	protected String fileTag = "";             // ex.: "mknapcb3"
+	protected int instanceIdx = 0;             // ex.: 17
+	protected String algo = "GA";              // "GA","ISGA","KMeansGA", etc.
+	protected String variant = "";             // flags/TS etc. livre
+	protected long seed = 0L;                  // semente usada
+
+	protected MetricsLogger metricsLogger;
+
+	public void setBenchmark(double bk, double ubLP) { this.bestKnown = bk; this.ubLP = ubLP; }
+	public void setRunInfo(String datasetId, String fileTag, int instanceIdx,
+						String algo, String variant, long seed) {
+	this.datasetId = datasetId; this.fileTag = fileTag; this.instanceIdx = instanceIdx;
+	this.algo = algo; this.variant = variant; this.seed = seed;
+	}
+	public void setMetricsLogger(MetricsLogger logger) { this.metricsLogger = logger; }
+
+	// Converte um Chromosome<T extends Number> para vetor booleano (bit=gene!=0)
+	protected boolean[] toBool(Chromosome c) {
+		boolean[] b = new boolean[c.size()];
+		for (int i = 0; i < c.size(); i++) b[i] = c.get(i).intValue() != 0;
+		return b;
+	}
+	protected List<boolean[]> toBoolPop(Population pop) {
+		List<boolean[]> list = new java.util.ArrayList<>(pop.size());
+		for (Chromosome c : pop) list.add(toBool(c));
+		return list;
+	}
 	/**
 	 * GA mainframe with NEW stopping criteria:
 	 * - time limit (default 30 minutes), OR
@@ -180,14 +213,30 @@ public abstract class AbstractGA<G extends Number, F> {
 		bestSol = decode(bestChromosome);
 		if (verbose) System.out.println("(Gen. 0) BestSol = " + bestSol);
 
-		// ================== Stopping Criteria ==================
-		final long deadline = System.nanoTime() + maxRuntimeNanos;
+		final long t0 = System.nanoTime();
+		final long deadline = t0 + maxRuntimeNanos;
 		final int stagnationLimit = Math.max(1, stagnationFactor * chromosomeSize);
 		int noImprovement = 0;
 		int g = 0;
-		// ===============================================================
 
-		/* main loop */
+		// Acumuladores de diversidade (médias ao longo das gerações)
+		double accDivHamming = 0.0, accDivEntropy = 0.0;
+		int accDivCount = 0;
+
+		// ---- LOG por geração (g=0) ----
+		{
+			List<boolean[]> popBits = toBoolPop(population);
+			double divH = utils.Diversity.meanHammingToMedoid(popBits);
+			double divE = utils.Diversity.meanLocusEntropy(popBits);
+			accDivHamming += divH; accDivEntropy += divE; accDivCount++;
+			if (metricsLogger != null) {
+			long elapsedMs = (System.nanoTime() - t0) / 1_000_000L;
+			metricsLogger.logGeneration(datasetId, fileTag, instanceIdx, algo, variant, seed,
+										0, elapsedMs, bestSol.cost, divH, divE);
+			}
+		}
+
+		// === main loop ===
 		while (System.nanoTime() < deadline && noImprovement < stagnationLimit) {
 			g++;
 
@@ -203,20 +252,57 @@ public abstract class AbstractGA<G extends Number, F> {
 			double currentBestFit = fitness(bestChromosome);
 			if (currentBestFit > bestSol.cost) {
 				bestSol = decode(bestChromosome);
-				noImprovement = 0; // reset estagnação
+				noImprovement = 0;
 				if (verbose) System.out.println("(Gen. " + g + ") BestSol = " + bestSol);
 			} else {
 				noImprovement++;
 			}
+
+			// ---- Diversidade e log desta geração ----
+			List<boolean[]> popBits = toBoolPop(population);
+			double divH = utils.Diversity.meanHammingToMedoid(popBits);
+			double divE = utils.Diversity.meanLocusEntropy(popBits);
+			accDivHamming += divH; accDivEntropy += divE; accDivCount++;
+
+			if (metricsLogger != null) {
+			long elapsedMs = (System.nanoTime() - t0) / 1_000_000L;
+			metricsLogger.logGeneration(datasetId, fileTag, instanceIdx, algo, variant, seed,
+										g, elapsedMs, bestSol.cost, divH, divE);
+			}
 		}
+
+		long totalMs = (System.nanoTime() - t0) / 1_000_000L;
+		String stopReason = (noImprovement >= stagnationLimit)
+			? ("stagnation_" + stagnationLimit)
+			: "time_limit";
+
 		if (verbose) {
 			System.out.println("Finished after " + g + " generations.");
-			System.out.println("Best solution found: " + bestSol + " in time: " + (System.nanoTime() / 1e9) + " seconds.");
-			if(noImprovement >= stagnationLimit) {
-				System.out.println("Stopping criterion: no improvement in " + stagnationLimit + " generations.");
-			} else {
-				System.out.println("Stopping criterion: time limit reached.");
-			}
+			System.out.println("Best solution found: " + bestSol + " in time: " + (totalMs/1000.0) + " s.");
+			System.out.println("Stopping criterion: " + stopReason + ".");
+		}
+
+		// === SUMÁRIO DA EXECUÇÃO (lucro e gaps) ===
+		double f = bestSol.cost;
+		double gapLPpct = (Double.isFinite(ubLP) && ubLP > 0.0) ? 100.0 * (ubLP - f) / ubLP : Double.NaN;
+		double deltaBK = (Double.isFinite(bestKnown)) ? (f - bestKnown) : Double.NaN;
+		double gapBKpct = (Double.isFinite(bestKnown) && Math.abs(bestKnown) > 0.0)
+			? 100.0 * (bestKnown - f) / Math.abs(bestKnown)
+			: Double.NaN;
+
+		double divHavg = (accDivCount > 0) ? (accDivHamming / accDivCount) : Double.NaN;
+		double divEavg = (accDivCount > 0) ? (accDivEntropy / accDivCount) : Double.NaN;
+
+		if (metricsLogger != null) {
+			MetricsLogger.RunSummary s = new MetricsLogger.RunSummary(
+			datasetId, fileTag, instanceIdx,
+			algo, variant, seed,
+			g, totalMs,
+			f, bestKnown, ubLP,
+			gapLPpct, gapBKpct, deltaBK,
+			divHavg, divEavg, stopReason
+			);
+			metricsLogger.logRunSummary(s);
 		}
 
 		return bestSol;
