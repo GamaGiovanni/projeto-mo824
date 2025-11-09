@@ -211,7 +211,7 @@ public abstract class AbstractGA<G extends Number, F> {
 		}
 		if (verbose) {
 			System.out.println("Finished after " + g + " generations.");
-			System.out.println("Best solution found: " + bestSol);
+			System.out.println("Best solution found: " + bestSol + " in time: " + (System.nanoTime() / 1e9) + " seconds.");
 			if(noImprovement >= stagnationLimit) {
 				System.out.println("Stopping criterion: no improvement in " + stagnationLimit + " generations.");
 			} else {
