@@ -1,5 +1,9 @@
 package problems.mkp.solvers;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -9,6 +13,7 @@ import problems.Evaluator;
 import problems.mkp.MKP_ORLib;
 import solutions.Solution;
 import metaheuristics.ls.LocalImprover;
+import utils.MetricsLogger;
 
 /**
  * GA para MKP com escolha de pais por k-means.
@@ -328,11 +333,133 @@ public class KMeansGA_MKP extends GA_MKP {
             // opcional: ga.setLocalSearchSteps(tsSteps);
         }
 
-        Solution<Integer> best = ga.solve();
-        System.out.println("Best (cost=" + best.cost + "): " + best);
-        if (evaluator.optimalFromFile != null && evaluator.optimalFromFile > 0) {
-            System.out.println("Opt (file) = " + evaluator.optimalFromFile);
+        // === parâmetros de execução/registro (opcionais por CLI) ===
+        String resultsDir = cli.getOrDefault("results-dir", "results");
+        String algo = cli.getOrDefault("algo", KMeansGA_MKP.class.getSimpleName());
+        String variant = cli.getOrDefault("variant", buildAutoVariant(mut, repair, tsOn, k, tourn, maxIter, bitSample, clusterEveryG, cli));
+        long seed = Long.parseLong(cli.getOrDefault("seed", "0"));
+        String mkcbresPath = cli.get("mkcbres"); // pode vir por CLI; senão tentamos inferir abaixo
+
+        // (opcional) setar seed se você ajustou o AbstractGA para permitir
+        // AbstractGA.setSeed(seed);
+
+        // === dataset/fileTag e mkcbres ===
+        Path orlib = Paths.get(path);
+        String fileTag = stripExt(orlib.getFileName().toString()); // "mknapcb3"
+        String datasetId = "ORLIB";
+
+        if (mkcbresPath == null) {
+            // tenta mkcbres ao lado do mknapcbX.txt; se não existir, usa "mkcbres.txt" na raiz
+            Path guess = (orlib.getParent() != null)
+                    ? orlib.getParent().resolve("mkcbres.txt")
+                    : Paths.get("mkcbres.txt");
+            mkcbresPath = Files.exists(guess) ? guess.toString() : "mkcbres.txt";
         }
+
+        // === ler BK e LP da referência e injetar no GA ===
+        double bk = Double.NaN, ublp = Double.NaN;
+        try {
+            Ref ref = readBKLP(mkcbresPath, fileTag, inst);
+            if (ref != null) { bk = ref.bk; ublp = ref.ublp; }
+        } catch (Exception ex) {
+            System.err.println("Aviso: falha ao ler mkcbres ("+mkcbresPath+"): " + ex.getMessage());
+        }
+        ga.setBenchmark(bk, ublp);
+        ga.setRunInfo(datasetId, fileTag, inst, algo, variant, seed);
+
+        // === preparar logger e delegar logging ao AbstractGA.solve() ===
+        Files.createDirectories(Paths.get(resultsDir));
+        try (MetricsLogger logger = new MetricsLogger(
+                Paths.get(resultsDir, "results_runs.csv"),
+                Paths.get(resultsDir, "results_gens.csv"),
+                true)) {
+            ga.setMetricsLogger(logger);
+            Solution<Integer> best = ga.solve();
+            System.out.println(best.cost);
+        }
+    }
+
+    private static String stripExt(String s) {
+        int dot = s.lastIndexOf('.');
+        return (dot >= 0) ? s.substring(0, dot) : s;
+    }
+
+    /** Monta um 'variant' legível se não vier por CLI — útil nos CSVs. */
+    private static String buildAutoVariant(double mut, boolean repair, boolean tsOn,
+                                           int k, int tourn, int maxIter, int bitSample, int clusterEveryG,
+                                           java.util.Map<String,String> cli) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("mut=").append(String.format(java.util.Locale.US, "%.4f", mut));
+        sb.append(";repair=").append(repair);
+        sb.append(";k=").append(k);
+        sb.append(";tourn=").append(tourn);
+        sb.append(";maxIter=").append(maxIter);
+        sb.append(";bitSample=").append(bitSample);
+        sb.append(";clusterEveryG=").append(clusterEveryG);
+        sb.append(";ts=").append(tsOn);
+        // se TS estiver on, acrescenta alguns parâmetros relevantes (se existirem)
+        if (tsOn) {
+            if (cli.containsKey("tenure"))  sb.append(";tenure=").append(cli.get("tenure"));
+            if (cli.containsKey("steps") || cli.containsKey("ts-steps"))
+                sb.append(";steps=").append(cli.getOrDefault("ts-steps", cli.getOrDefault("steps","")));
+            if (cli.containsKey("vmin"))    sb.append(";vmin=").append(cli.get("vmin"));
+            if (cli.containsKey("vmax"))    sb.append(";vmax=").append(cli.get("vmax"));
+            if (cli.containsKey("lmbMin"))  sb.append(";lmbMin=").append(cli.get("lmbMin"));
+            if (cli.containsKey("lmbMax"))  sb.append(";lmbMax=").append(cli.get("lmbMax"));
+            if (cli.containsKey("up"))      sb.append(";up=").append(cli.get("up"));
+            if (cli.containsKey("down"))    sb.append(";down=").append(cli.get("down"));
+        }
+        return sb.toString();
+    }
+
+    private static final class Ref {
+        final double bk, ublp;
+        Ref(double bk, double ublp){ this.bk=bk; this.ublp=ublp; }
+    }
+
+    private static Ref readBKLP(String mkcbresPath, String fileTag, int idx) throws IOException {
+        // mknapcb1..9  ->  blocos: 5.100, 5.250, 5.500, 10.100, 10.250, 10.500, 30.100, 30.250, 30.500
+        // idx esperado: 1..30
+        int X = Integer.parseInt(fileTag.replaceAll("\\D+", "")); // "mknapcb3" -> 3
+        int pos = (X - 1) * 30 + (idx - 1); // 0..269
+
+        java.util.List<Double> bests = new java.util.ArrayList<>(270);
+        java.util.List<Double> lps    = new java.util.ArrayList<>(270);
+
+        boolean inBK = false, inLP = false;
+
+        // Linha de dados: "5.500-12   217534"  ou  "5.500-12   2.1761579702e+05"
+        java.util.regex.Pattern row = java.util.regex.Pattern.compile(
+            "^(\\d+\\.\\d+-\\d{2})\\s+([0-9.+\\-Ee]+)\\s*$"
+        );
+
+        try (java.io.BufferedReader br = java.nio.file.Files.newBufferedReader(java.nio.file.Paths.get(mkcbresPath))) {
+            String ln;
+            while ((ln = br.readLine()) != null) {
+                ln = ln.trim();
+                if (ln.isEmpty()) continue;
+
+                // Detecta início de cada tabela
+                if (ln.contains("Best Feasible Solution Value")) { inBK = true;  inLP = false; continue; }
+                if (ln.contains("LP optimal"))                  { inBK = false; inLP = true;  continue; }
+
+                java.util.regex.Matcher m = row.matcher(ln);
+                if (!m.matches()) continue; // ignora cabeçalhos e textos
+
+                // m.group(1) = "5.500-12" (não usamos para o 'pos' aqui)
+                double val = Double.parseDouble(m.group(2));
+
+                if (inBK) bests.add(val);
+                else if (inLP) lps.add(val);
+            }
+        }
+
+        if (pos < 0 || pos >= bests.size() || pos >= lps.size()) {
+            throw new IOException("índice fora do mkcbres (pos=" + pos +
+                                "; BK=" + bests.size() + ", LP=" + lps.size() + ")");
+        }
+
+        return new Ref(bests.get(pos), lps.get(pos));
     }
 
     protected static void printHelp() {
