@@ -22,7 +22,7 @@ UP="${UP-}"
 DOWN="${DOWN-}"
 
 RANGE_START="${RANGE_START:-1}"
-RANGE_END="${RANGE_END:-10}"
+RANGE_END="${RANGE_END:-30}"
 
 # ===== Parse CLI (sobrescreve os defaults acima) =====
 EXTRA_ARGS=()
