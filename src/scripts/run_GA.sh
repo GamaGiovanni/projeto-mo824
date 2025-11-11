@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ===== Defaults (podem ser sobrescritos por env e/ou CLI) =====
-PATH_ORLIB="${PATH_ORLIB:-../../instances/mkp/mknapcb1.txt}"
+PATH_ORLIB="${PATH_ORLIB:-../../instances/mkp/mknapcb2.txt}"
 CLASS="${CLASS:-problems.mkp.solvers.GA_MKP}"
 CP="${CP:-../../out}"
 
@@ -21,7 +21,7 @@ LMBMAX="${LMBMAX-}"
 UP="${UP-}"
 DOWN="${DOWN-}"
 
-RANGE_START="${RANGE_START:-1}"
+RANGE_START="${RANGE_START:-21}"
 RANGE_END="${RANGE_END:-30}"
 
 # ===== Parse CLI (sobrescreve os defaults acima) =====

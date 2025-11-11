@@ -1,0 +1,1 @@
+java -cp ../../out problems.mkp.solvers.GA_MKP --instance <ID> --path ../../instances/mkp/mknapcb2.txt --pop 150 --mutation 0.004 --repair true 
