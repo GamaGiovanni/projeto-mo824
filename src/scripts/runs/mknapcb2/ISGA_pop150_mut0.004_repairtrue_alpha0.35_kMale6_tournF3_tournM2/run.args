@@ -1,0 +1,1 @@
+java -cp ../../out problems.mkp.solvers.ISGA_MKP --instance <ID> --path ../../instances/mkp/mknapcb2.txt --pop 150 --mutation 0.004 --repair true --alpha 0.35 --kMale 6 --tournF 3 --tournM 2 
