@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ===== Defaults (podem ser sobrescritos por env e/ou CLI) =====
-PATH_ORLIB="${PATH_ORLIB:-../../instances/mkp/mknapcb2.txt}"
+PATH_ORLIB="${PATH_ORLIB:-../../instances/mkp/mknapcb3.txt}"
 CLASS="${CLASS:-problems.mkp.solvers.GA_MKP}"
 CP="${CP:-../../out}"
 
