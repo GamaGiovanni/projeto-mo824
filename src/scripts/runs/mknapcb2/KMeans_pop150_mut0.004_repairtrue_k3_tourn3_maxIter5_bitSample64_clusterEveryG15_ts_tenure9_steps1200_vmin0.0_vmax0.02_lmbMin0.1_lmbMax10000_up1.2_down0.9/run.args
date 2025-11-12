@@ -1,0 +1,1 @@
+java -cp ../../out problems.mkp.solvers.KMeansGA_MKP --instance <ID> --path ../../instances/mkp/mknapcb2.txt --pop 150 --mutation 0.004 --repair true --k 3 --tourn 3 --maxIter 5 --bitSample 64 --clusterEveryG 15 --ts true --tenure 9 --ts-steps 1200 --vmin 0.0 --vmax 0.02 --lmbMin 0.1 --lmbMax 10000 --up 1.2 --down 0.9 
