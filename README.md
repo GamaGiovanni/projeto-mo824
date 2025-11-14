@@ -5,7 +5,7 @@ Este repositório contém uma base de **Algoritmo Genético (GA)** genérico em 
 * **MKP** (Multidimensional Knapsack Problem) — leitura no formato da **OR-Library** e avaliação com penalização e *repair* opcional.
 * **ISGA para MKP** — variação do GA com **seleção sexual** que prioriza diversidade por distância de Hamming, preservando o GA baseline para comparações.
 * **KMeansGA para MKP** — variação do GA com **escolha de pais por k-means** (acasalamento entre *clusters* distintos), focada em manter diversidade estrutural com baixo custo.
-* **(Novo)** **TS+SO para MKP** — **melhoria local** via Tabu Search com *Strategic Oscillation*, **plugável** em qualquer solver (baseline, ISGA, KMeans) por linha de comando.
+* **TS+SO para MKP** — **melhoria local** via Tabu Search com *Strategic Oscillation*, **plugável** em qualquer solver (baseline, ISGA, KMeans) por linha de comando.
 
 > Curso-alvo / referência: MO824/MC859 (otimização/heurísticas).
 
@@ -13,17 +13,17 @@ Este repositório contém uma base de **Algoritmo Genético (GA)** genérico em 
 
 ## Visão geral
 
-* **Framework GA** (`metaheuristics.ga.AbstractGA`): define o ciclo GA (seleção por torneio, crossover 2-pontos, mutação, elitismo) de forma abstrata.
-* **Hook memético**: `AbstractGA` expõe `postGenerationHook(...)` — os solvers podem acoplar melhoria local (ex.: TS) **sem** alterar o pipeline do GA.
+* **Framework GA** ([`metaheuristics.ga.AbstractGA`](src/metaheuristics/ga/AbstractGA.java)): define o ciclo GA (seleção por torneio, crossover 2-pontos, mutação, elitismo) de forma abstrata.
+* **Hook memético**: [`AbstractGA`](src/metaheuristics/ga/AbstractGA.java) expõe `postGenerationHook(...)` — os solvers podem acoplar melhoria local (ex.: TS) **sem** alterar o pipeline do GA.
 * **Módulo de melhoria local**:
 
-  * `metaheuristics.ls.LocalImprover` — interface genérica para melhorias locais.
-  * `problems.mkp.ls.TabuSO_MKP` — implementação de **Tabu Search + Strategic Oscillation** para MKP, usando deltas incrementais.
-* **MKP** (`problems.mkp`): inclui `MKP_ORLib` (parser/avaliador OR-Library) e três solvers:
+  * [`metaheuristics.ls.LocalImprover`](src/metaheuristics/ls/LocalImprover.java) — interface genérica para melhorias locais.
+  * [`problems.mkp.TabuSO_MKP`](src/problems/mkp/TabuSO_MKP.java) — implementação de **Tabu Search + Strategic Oscillation** para MKP, usando deltas incrementais.
+* **MKP** (`problems.mkp`): inclui [`MKP_ORLib`](src/problems/mkp/MKP_ORLib.java) (parser/avaliador OR-Library) e três solvers:
 
-  * `problems.mkp.solvers.GA_MKP` — **baseline** com *repair* guloso opcional.
-  * `problems.mkp.solvers.ISGA_MKP` — **ISGA** (seleção sexual) que **sobrescreve apenas a seleção de pais**.
-  * `problems.mkp.solvers.KMeansGA_MKP` — **KMeansGA** (pais por k-means) que **clusteriza a população** e força acasalamento **entre clusters distintos**.
+  * [`problems.mkp.solvers.GA_MKP`](src/problems/mkp/solvers/GA_MKP.java) — **baseline** com *repair* guloso opcional.
+  * [`problems.mkp.solvers.ISGA_MKP`](src/problems/mkp/solvers/ISGA_MKP.java) — **ISGA** (seleção sexual) que **sobrescreve apenas a seleção de pais**.
+  * [`problems.mkp.solvers.KMeansGA_MKP`](src/problems/mkp/solvers/KMeansGA_MKP.java) — **KMeansGA** (pais por k-means) que **clusteriza a população** e força acasalamento **entre clusters distintos**.
 
 Características comuns (GA para MKP):
 
@@ -54,27 +54,43 @@ projeto-mo824/
 ├── src/
 │   ├── metaheuristics/
 │   │   ├── ga/
-│   │   │   └── AbstractGA.java
+│   │   │   └── AbstractGA.java                   # framework GA genérico
 │   │   └── ls/
-│   │       └── LocalImprover.java                 # interface p/ melhorias locais
+│   │       └── LocalImprover.java                # interface p/ melhorias locais
 │   ├── problems/
-│   │   ├── mkp/
-│   │   │   ├── MKP_ORLib.java
-│   │   │   ├── ls/
-│   │   │   │   └── TabuSO_MKP.java               # TS+SO para MKP
-│   │   │   └── solvers/
-│   │   │       ├── GA_MKP.java                   # baseline
-│   │   │       ├── ISGA_MKP.java                 # seleção sexual
-│   │   │       └── KMeansGA_MKP.java             # pais por k-means
-│   └── solutions/
-│       └── Solution.java
+│   │   ├── Evaluator.java                        # interface de avaliação
+│   │   └── mkp/
+│   │       ├── MKP_ORLib.java                    # parser/avaliador OR-Library
+│   │       ├── TabuSO_MKP.java                   # TS+SO para MKP
+│   │       └── solvers/
+│   │           ├── GA_MKP.java                   # baseline
+│   │           ├── ISGA_MKP.java                 # seleção sexual
+│   │           └── KMeansGA_MKP.java             # pais por k-means
+│   ├── solutions/
+│   │   └── Solution.java                         # representação de solução
+│   └── utils/
+│       ├── Diversity.java                        # métricas de diversidade
+│       ├── MetricsLogger.java                    # logging de métricas
+│       └── Mkcbres.java                          # parser de resultados OR-Library
 ├── instances/
 │   └── mkp/
-│       ├── README.md
-│       ├── mknap1.txt
-│       ├── mknapcb1.txt
-│       ├── mknapcb2.txt
-│       └── mknapcb3.txt
+│       ├── README.md                             # formato OR-Library
+│       ├── mkcbres.txt                           # resultados conhecidos
+│       ├── mknapcb1.txt                          # instâncias 5 restrições
+│       ├── mknapcb2.txt                          # instâncias 10 restrições
+│       └── mknapcb3.txt                          # instâncias 30 restrições
+├── scripts/
+│   ├── run_GA.sh                                 # script execução GA baseline
+│   ├── run_ISGA.sh                               # script execução ISGA
+│   ├── run_Kmeans.sh                             # script execução KMeansGA
+│   ├── results/
+│   │   └── results_runs.csv                      # resultados consolidados
+│   └── runs/                                     # logs de execução por instância
+│       ├── mknapcb1/
+│       ├── mknapcb2/
+│       └── mknapcb3/
+├── out/                                          # bytecode compilado (gerado)
+├── sources.txt                                   # lista de arquivos .java (gerado)
 └── README.md
 ```
 
