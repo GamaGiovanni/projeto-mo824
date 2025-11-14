@@ -36,10 +36,10 @@ public class TabuSO_MKP implements LocalImprover<Integer> {
 
     @Override
     public Solution<Integer> improve(Solution<Integer> s, int maxSteps, long deadlineMillis) {
-        // Make a working copy
+        // Make a working copy.
         Solution<Integer> cur = new Solution<>();
         cur.addAll(s);
-        eval.evaluate(cur); // updates accumulators
+        eval.evaluate(cur); // Updates accumulators.
 
         double bestCost = cur.cost;
         Solution<Integer> best = new Solution<>();
@@ -52,19 +52,19 @@ public class TabuSO_MKP implements LocalImprover<Integer> {
         while ((maxSteps <= 0 || step < maxSteps) &&
                (deadlineMillis <= 0 || System.currentTimeMillis() < deadlineMillis)) {
 
-            // SO control on penalty factor
+            // Strategic Oscillation (SO) control on penalty factor.
             double v = currentViolationOf(cur);
             if (v > vMax)      eval.penaltyFactor = Math.min(lmbMax, Math.max(lmbMin, eval.penaltyFactor * upFactor));
             else if (v < vMin) eval.penaltyFactor = Math.min(lmbMax, Math.max(lmbMin, eval.penaltyFactor * downFactor));
 
-            // Best admissible 1-flip
+            // Best admissible 1-flip.
             int bestMove = -1;
             double bestDelta = Double.NEGATIVE_INFINITY;
 
-            // Work with eval's variables synced with 'cur'
+            // Work with eval's variables synced with 'cur'.
             eval.setVariables(cur);
 
-            // Evaluate all 1-flip moves (O(n*m) but with deltas)
+            // Evaluate all 1-flip moves (O(n*m) but with deltas).
             for (int i = 0; i < n; i++) {
                 double delta;
                 if (cur.contains(i)) {
@@ -73,7 +73,7 @@ public class TabuSO_MKP implements LocalImprover<Integer> {
                     delta = eval.evaluateInsertionMKP(i);
                 }
                 boolean isTabu = (tabu[i] > step);
-                boolean aspire = (cur.cost + delta > bestCost); // aspiration by improving best
+                boolean aspire = (cur.cost + delta > bestCost); // Aspiration by improving best.
 
                 if (!isTabu || aspire) {
                     if (delta > bestDelta) {
@@ -86,22 +86,22 @@ public class TabuSO_MKP implements LocalImprover<Integer> {
             if (bestMove < 0 || bestDelta <= 0.0) {
                 // No improving move; accept best admissible (even if worsening) to keep moving.
                 bestMove = argBestWorseningMove(cur, tabu, step);
-                if (bestMove < 0) break; // stuck
+                if (bestMove < 0) break; // Stuck.
                 bestDelta = (cur.contains(bestMove) ? eval.evaluateRemovalMKP(bestMove)
                                                     : eval.evaluateInsertionMKP(bestMove));
             }
 
-            // Apply move
+            // Apply move.
             if (cur.contains(bestMove)) {
                 cur.remove(Integer.valueOf(bestMove));
             } else {
                 cur.add(bestMove);
             }
-            eval.evaluate(cur); // update cost
-            // Tabu tenure
+            eval.evaluate(cur); // Update cost.
+            // Tabu tenure.
             tabu[bestMove] = step + tenure;
 
-            // Track global best
+            // Track global best.
             if (cur.cost > bestCost) {
                 bestCost = cur.cost;
                 best.clear();
@@ -120,7 +120,7 @@ public class TabuSO_MKP implements LocalImprover<Integer> {
         int arg = -1;
         double bestVal = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < n; i++) {
-            if (tabu[i] > step) continue; // keep tabu for worsening steps
+            if (tabu[i] > step) continue; // Keep tabu for worsening steps.
             double delta = cur.contains(i) ? eval.evaluateRemovalMKP(i) : eval.evaluateInsertionMKP(i);
             if (delta > bestVal) {
                 bestVal = delta;
@@ -131,6 +131,11 @@ public class TabuSO_MKP implements LocalImprover<Integer> {
     }
 
     
+    /**
+     * Calculates the current violation of the solution.
+     * @param cur The current solution.
+     * @return The total violation.
+     */
      private double currentViolationOf(Solution<Integer> cur) {
         double v = 0.0;
         final int m = eval.m;

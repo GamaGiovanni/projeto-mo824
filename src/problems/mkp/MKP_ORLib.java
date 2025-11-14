@@ -11,55 +11,55 @@ import problems.Evaluator;
 import solutions.Solution;
 
 /**
- * Multidimensional Knapsack Problem (MKP) no formato OR-Library.
+ * Multidimensional Knapsack Problem (MKP) in OR-Library format.
  *
- * Maximizar:    sum_i p[i] * x_i
- * s.a.:         sum_i w[k][i] * x_i <= b[k],  k = 0..m-1
- *               x_i ∈ {0,1}
+ * Maximize:    sum_i p[i] * x_i
+ * Subject to:  sum_i w[k][i] * x_i <= b[k],  k = 0..m-1
+ *              x_i ∈ {0,1}
  *
- * Leitura no formato de mknap1/mknapcb*: várias instâncias no mesmo arquivo
- * (ver página da OR-Library ou ./instances). Esta classe usa avaliação penalizada para permitir
- * soluções inviáveis durante a busca: f(x) = lucro(x) - λ * Σ_k over_k,
- * com over_k = max(0, carga_k - b[k]).
+ * Reads in mknap1/mknapcb* format: multiple instances in the same file
+ * (see OR-Library page or ./instances). This class uses penalized evaluation to allow
+ * infeasible solutions during the search: f(x) = profit(x) - λ * Σ_k over_k,
+ * where over_k = max(0, load_k - b[k]).
  */
 public class MKP_ORLib implements Evaluator<Integer> {
 
-    /** Número de itens. */
+    /** Number of items. */
     public final Integer size;
 
-    /** Número de restrições. */
+    /** Number of constraints. */
     public final Integer m;
 
-    /** Índice (1-based) da instância dentro do arquivo OR-Library. */
+    /** 1-based index of the instance within the OR-Library file. */
     public final int problemIndex;
 
-    /** Lucros p[i]. */
+    /** Profits p[i]. */
     public final Double[] p;
 
-    /** Pesos w[k][i]. */
+    /** Weights w[k][i]. */
     public final Double[][] w;
 
-    /** Capacidades b[k]. */
+    /** Capacities b[k]. */
     public final Double[] b;
 
-    /** Valor ótimo informado no arquivo (0.0 se indisponível). */
+    /** Optimal value reported in the file (0.0 if unavailable). */
     public final Double optimalFromFile;
 
-    /** Variáveis binárias (como Double, p/ compatibilidade com a infra). */
+    /** Binary variables (as Double, for compatibility with the infrastructure). */
     public final Double[] variables;
 
-    /** Fator de penalidade λ. */
+    /** Penalty factor λ. */
     public double penaltyFactor;
 
-    // --- Acumuladores para avaliação incremental ---
-    private final Double[] accWeight; // soma de pesos por restrição
+    // --- Accumulators for incremental evaluation ---
+    private final Double[] accWeight; // sum of weights per constraint
     private Double accProfit;
 
-    // ---------------------- Construtores ----------------------
+    // ---------------------- Constructors ----------------------
 
     /**
-     * Lê uma instância OR-Library (mknap1 ou mknapcb*) e seleciona a k-ésima (1..K).
-     * λ (penaltyFactor) é ajustado automaticamente para a média dos lucros.
+     * Reads an OR-Library instance (mknap1 or mknapcb*) and selects the k-th (1..K).
+     * λ (penaltyFactor) is automatically adjusted to the average of profits.
      */
     public MKP_ORLib(String filename, int instanceIndex) throws IOException {
         Loader out = readOrLibInstance(filename, instanceIndex);
@@ -82,14 +82,14 @@ public class MKP_ORLib implements Evaluator<Integer> {
     }
 
     /**
-     * Mesmo que o anterior, mas com λ informado.
+     * Same as the previous constructor, but with λ provided.
      */
     public MKP_ORLib(String filename, int instanceIndex, double penaltyFactor) throws IOException {
         this(filename, instanceIndex);
         this.penaltyFactor = penaltyFactor;
     }
 
-    // ------------------- Avaliação da solução -------------------
+    // ------------------- Solution Evaluation -------------------
 
     @Override
     public Integer getDomainSize() { return size; }
@@ -100,7 +100,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         return sol.cost = evaluateMKP();
     }
 
-    /** Seta variables[] a partir de sol e recalcula acumuladores. */
+    /** Sets variables[] from sol and recalculates accumulators. */
     public void setVariables(Solution<Integer> sol) {
         resetVariables();
         resetAccumulators();
@@ -115,7 +115,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         }
     }
 
-    /** f(x) = lucro - λ * soma dos excessos. */
+    /** f(x) = profit - λ * sum of excesses. */
     public Double evaluateMKP() {
         double overSum = 0.0;
         for (int k = 0; k < m; k++) {
@@ -125,7 +125,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         return accProfit - penaltyFactor * overSum;
     }
 
-    // ---------------- custos incrementais (O(m)) ----------------
+    // ---------------- Incremental Costs (O(m)) ----------------
 
     @Override
     public Double evaluateInsertionCost(Integer elem, Solution<Integer> sol) {
@@ -145,7 +145,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         return evaluateExchangeMKP(in, out);
     }
 
-    /** Δ inserir i. */
+    /** Δ insert i. */
     public Double evaluateInsertionMKP(int i) {
         if (variables[i] == 1.0) return 0.0;
         double dProfit = p[i];
@@ -158,7 +158,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         return dProfit - penaltyFactor * dPenalty;
     }
 
-    /** Δ remover i. */
+    /** Δ remove i. */
     public Double evaluateRemovalMKP(int i) {
         if (variables[i] == 0.0) return 0.0;
         double dProfit = -p[i];
@@ -171,7 +171,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         return dProfit - penaltyFactor * dPenalty;
     }
 
-    /** Δ trocar out → in. */
+    /** Δ swap out → in. */
     public Double evaluateExchangeMKP(int in, int out) {
         if (in == out) return 0.0;
         if (variables[in] == 1.0 && variables[out] == 1.0) return evaluateRemovalMKP(out);
@@ -189,25 +189,25 @@ public class MKP_ORLib implements Evaluator<Integer> {
         return dProfit - penaltyFactor * dPenalty;
     }
 
-    // ------------------------- Utilidades -------------------------
+    // ------------------------- Utilities -------------------------
 
-    /** Zera variables[]. */
+    /** Resets variables[]. */
     public void resetVariables() { Arrays.fill(variables, 0.0); }
 
-    /** Zera acumuladores. */
+    /** Resets accumulators. */
     private void resetAccumulators() {
         Arrays.fill(accWeight, 0.0);
         accProfit = 0.0;
     }
 
-    /** λ padrão: média dos lucros (boa escala inicial). */
+    /** Default λ: average of profits (good initial scale). */
     private double defaultPenaltyFactor() {
         double s = 0.0;
         for (double v : p) s += v;
         return (p.length > 0) ? s / p.length : 1.0;
     }
 
-    /** Debug: imprime a instância carregada. */
+    /** Debug: prints the loaded instance. */
     public void printInstance() {
         System.out.println("MKP OR-Library: n=" + size + ", m=" + m + ", idx=" + problemIndex
                 + ", opt(file)=" + optimalFromFile);
@@ -216,7 +216,7 @@ public class MKP_ORLib implements Evaluator<Integer> {
         System.out.println("b: " + Arrays.toString(b));
     }
 
-    // --------------------- Leitura OR-Library ---------------------
+    // --------------------- OR-Library Reading ---------------------
 
     private static final class Loader {
         int n, m;
@@ -226,38 +226,38 @@ public class MKP_ORLib implements Evaluator<Integer> {
     }
 
     /**
-     * Lê um arquivo OR-Library (mknap1 / mknapcb*) e devolve a instância 'instanceIndex' (1..K).
-     * Formato conforme documentação da OR-Library. :contentReference[oaicite:2]{index=2}
+     * Reads an OR-Library file (mknap1 / mknapcb*) and returns the 'instanceIndex' (1..K) instance.
+     * Format according to OR-Library documentation.
      */
     private Loader readOrLibInstance(String filename, int instanceIndex) throws IOException {
-        if (instanceIndex <= 0) throw new IllegalArgumentException("instanceIndex deve ser >= 1");
+        if (instanceIndex <= 0) throw new IllegalArgumentException("instanceIndex must be >= 1");
 
         try (Reader r = new BufferedReader(new FileReader(filename))) {
             StreamTokenizer st = new StreamTokenizer(r);
             st.parseNumbers();
 
-            // K: número de instâncias
+            // K: number of instances
             nextNum(st);
             int K = (int) st.nval;
             if (instanceIndex > K) {
                 throw new IllegalArgumentException("instanceIndex=" + instanceIndex +
-                        " > K=" + K + " no arquivo " + filename);
+                        " > K=" + K + " in file " + filename);
             }
 
             Loader out = new Loader();
 
-            // Percorre instâncias até chegar na desejada
+            // Iterates through instances until the desired one is found
             for (int k = 1; k <= K; k++) {
                 nextNum(st); int n = (int) st.nval;
                 nextNum(st); int m = (int) st.nval;
                 nextNum(st); double opt = st.nval;
 
                 if (k != instanceIndex) {
-                    // descarta n lucros
+                    // Discards n profits
                     for (int i = 0; i < n; i++) nextNum(st);
-                    // descarta m*n pesos
+                    // Discards m*n weights
                     for (int c = 0; c < m; c++) for (int i = 0; i < n; i++) nextNum(st);
-                    // descarta m capacidades
+                    // Discards m capacities
                     for (int c = 0; c < m; c++) nextNum(st);
                 } else {
                     out.n = n; out.m = m; out.optVal = opt;
@@ -275,29 +275,29 @@ public class MKP_ORLib implements Evaluator<Integer> {
                 }
             }
 
-            // Se não retornou, algo deu errado
-            throw new IOException("Falha ao localizar a instância " + instanceIndex + " em " + filename);
+            // If not returned, something went wrong
+            throw new IOException("Failed to locate instance " + instanceIndex + " in " + filename);
         }
     }
 
-    /** Lê próximo token numérico (lança se EOF). */
+    /** Reads the next numeric token (throws EOF if unexpected). */
     private static void nextNum(StreamTokenizer st) throws IOException {
         int tt = st.nextToken();
         if (tt == StreamTokenizer.TT_EOF)
-            throw new IOException("Fim inesperado do arquivo OR-Library.");
-        // caso venha um símbolo não-numérico, tente avançar
+            throw new IOException("Unexpected end of OR-Library file.");
+        // If a non-numeric symbol comes, try to advance
         while (tt != StreamTokenizer.TT_NUMBER) {
             tt = st.nextToken();
             if (tt == StreamTokenizer.TT_EOF)
-                throw new IOException("Fim inesperado do arquivo OR-Library.");
+                throw new IOException("Unexpected end of OR-Library file.");
         }
     }
 
     // --------------------------- Main ---------------------------
 
     public static void main(String[] args) throws Exception {
-        // Uso:
-        // java MKP_ORLib path_para/mknapcb4.txt 17 [lambda]
+        // Usage:
+        // java MKP_ORLib path_to/mknapcb4.txt 17 [lambda]
         String path = (args.length >= 1) ? args[0] : "instances/orlib/mknap1.txt";
         int idx = (args.length >= 2) ? Integer.parseInt(args[1]) : 1;
 
@@ -305,9 +305,9 @@ public class MKP_ORLib implements Evaluator<Integer> {
                 ? new MKP_ORLib(path, idx, Double.parseDouble(args[2]))
                 : new MKP_ORLib(path, idx);
 
-        System.out.println("Carregado: n=" + mkp.size + ", m=" + mkp.m +
+        System.out.println("Loaded: n=" + mkp.size + ", m=" + mkp.m +
                 ", idx=" + mkp.problemIndex + ", opt(file)=" + mkp.optimalFromFile);
-        // Pequeno teste: busca aleatória
+        // Small test: random search
         Double best = Double.NEGATIVE_INFINITY;
         for (int it = 0; it < 50_000; it++) {
             Arrays.fill(mkp.variables, (Math.random() < 0.5) ? 0.0 : 1.0);
@@ -321,6 +321,6 @@ public class MKP_ORLib implements Evaluator<Integer> {
             double val = mkp.evaluateMKP();
             if (val > best) best = val;
         }
-        System.out.println("Melhor (random + penalização) = " + best);
+        System.out.println("Best (random + penalization) = " + best);
     }
 }

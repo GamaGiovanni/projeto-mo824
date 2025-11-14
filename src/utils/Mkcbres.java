@@ -23,7 +23,7 @@ public final class Mkcbres {
     }
   }
 
-  /** Instâncias numeradas de 1..30 dentro de cada mknapcbX; X ∈ {1..9} */
+  /** Instances numbered 1..30 within each mknapcbX; X ∈ {1..9} */
   public Ref get(String fileTag, int idx) {
     // fileTag = "mknapcb1"|"mknapcb2"|...; idx = 1..30
     int x = Integer.parseInt(fileTag.replaceAll("\\D+", ""));

@@ -15,26 +15,26 @@ import utils.MetricsLogger;
 import metaheuristics.ls.LocalImprover;
 
 /**
- * GA para MKP com Seleção Sexual (ISGA) que preserva o GA baseline original
- * (GA_MKP) e apenas sobrescreve a política de seleção de pais.
+ * GA for MKP with Sexual Selection (ISGA) that preserves the original baseline GA
+ * (GA_MKP) and only overrides the parent selection policy.
  *
- * Uso (mesmos argumentos do GA_MKP; parâmetros opcionais do ISGA ao final):
+ * Usage (same arguments as GA_MKP; optional ISGA parameters at the end):
  *   java problems.mkp.solvers.ISGA_MKP <path_orlib> <instanceIndex> <popSize> <mutationRate> <useRepair:true/false> [lambda] [alpha] [kMale] [tournF] [tournM]
- * Padrões:
- *   alpha = 0,5 (peso para aptidão vs. dissimilaridade)
- *   kMale = 6   (machos candidatos amostrados por fêmea)
- *   tournF = 3  (tamanho do torneio para escolha da fêmea)
- *   tournM = 2  (pré-filtro por torneio para candidatos machos por aptidão)
+ * Defaults:
+ *   alpha = 0.5 (weight for fitness vs. dissimilarity)
+ *   kMale = 6   (candidate males sampled per female)
+ *   tournF = 3  (tournament size for female selection)
+ *   tournM = 2  (pre-filter by tournament for male candidates by fitness)
  */
 public class ISGA_MKP extends GA_MKP {
 
-    /** Peso para aptidão (alpha) vs. dissimilaridade (1 - alpha) na escolha do parceiro. */
+    /** Weight for fitness (alpha) vs. dissimilarity (1 - alpha) in partner selection. */
     private final double alpha;
-    /** Número de machos candidatos considerados para cada fêmea. */
+    /** Number of candidate males considered for each female. */
     private final int kMale;
-    /** Tamanho do torneio ao selecionar fêmeas. */
+    /** Tournament size when selecting females. */
     private final int tournF;
-    /** Tamanho do pré-filtro por torneio do conjunto de machos (por aptidão). */
+    /** Pre-filter tournament size for the set of males (by fitness). */
     private final int tournM;
 
     public ISGA_MKP(Evaluator<Integer> objFunction,
@@ -52,12 +52,12 @@ public class ISGA_MKP extends GA_MKP {
         this.tournM = tournM;
     }
 
-    // ------------------------ Núcleo do ISGA ------------------------
+    // ------------------------ ISGA Core ------------------------
     @Override
     protected Population selectParents(Population population) {
         Population parents = new Population();
 
-        // Pré-calcula aptidão mínima/máxima para normalização.
+        // Pre-calculate minimum/maximum fitness for normalization.
         final double[] minFit = {Double.POSITIVE_INFINITY};
         double maxFit = Double.NEGATIVE_INFINITY;
         for (Chromosome c : population) {
@@ -68,23 +68,23 @@ public class ISGA_MKP extends GA_MKP {
         final double span = (maxFit > minFit[0]) ? (maxFit - minFit[0]) : 1.0;
 
         while (parents.size() < popSize) {
-            // 1) Escolhe uma fêmea por torneio baseado em aptidão.
+            // 1) Select a female by tournament based on fitness.
             Chromosome female = tournamentSelect(population, tournF);
 
-            // 2) Constrói um conjunto de machos candidatos: pré-filtro por torneio (aptidão)
-            //    e, em seguida, pontua por escore composto (alpha * aptidão + (1-alpha) * dissimilaridade).
+            // 2) Build a set of candidate males: pre-filter by tournament (fitness)
+            //    and then score by composite score (alpha * fitness + (1-alpha) * dissimilarity).
             List<Chromosome> malePool = new ArrayList<>();
             for (int i = 0; i < kMale; i++) {
                 malePool.add(tournamentSelect(population, tournM));
             }
 
-            // Evita acasalamento consigo mesma se houver duplicatas na população.
+            // Avoid mating with itself if there are duplicates in the population.
             malePool.removeIf(m -> m == female);
             if (malePool.isEmpty()) {
                 malePool.add(tournamentSelect(population, tournM));
             }
 
-            // 3) Escolhe o melhor macho segundo o escore composto.
+            // 3) Select the best male according to the composite score.
             Chromosome male = Collections.max(
                 malePool,
                 Comparator.comparingDouble(m -> compositeMateScore(female, m, minFit[0], span, alpha))
@@ -97,7 +97,7 @@ public class ISGA_MKP extends GA_MKP {
         return parents;
     }
 
-    /** Seleção por torneio de tamanho k baseada em aptidão (quanto maior, melhor). */
+    /** Tournament selection of size k based on fitness (higher is better). */
     private Chromosome tournamentSelect(Population pop, int k) {
         Chromosome best = null;
         double bestFit = Double.NEGATIVE_INFINITY;
@@ -113,7 +113,7 @@ public class ISGA_MKP extends GA_MKP {
         return best;
     }
 
-    /** Score composto: alpha * normFitness(male) + (1 - alpha) * normHamming(female, male). */
+    /** Composite score: alpha * normFitness(male) + (1 - alpha) * normHamming(female, male). */
     private double compositeMateScore(Chromosome female,
                                       Chromosome male,
                                       double minFit,
@@ -124,7 +124,7 @@ public class ISGA_MKP extends GA_MKP {
         return alpha * fNorm + (1.0 - alpha) * dNorm;
     }
 
-    /** Distância de Hamming entre cromossomos binários (genes Integer 0/1). */
+    /** Hamming distance between binary chromosomes (Integer 0/1 genes). */
     private int hamming01(Chromosome a, Chromosome b) {
         int d = 0;
         for (int i = 0; i < chromosomeSize; i++) {
@@ -135,9 +135,9 @@ public class ISGA_MKP extends GA_MKP {
         return d;
     }
 
-    // ------------------------ Execução (Runner com parâmetros nomeados) ------------------------
+    // ------------------------ Execution (Runner with named parameters) ------------------------
     public static void main(String[] args) throws Exception {
-        // Exemplos:
+        // Examples:
         //  Baseline ISGA:
         //  java problems.mkp.solvers.ISGA_MKP --path instances/mkp/mknapcb1.txt --instance 1 --pop 100 --mutation 0.02 --repair true \
         //       --alpha 0.5 --kMale 6 --tournF 3 --tournM 2
@@ -154,20 +154,20 @@ public class ISGA_MKP extends GA_MKP {
 
         java.util.Map<String,String> cli = parseArgsToMap(args);
 
-        // --- parâmetros base do GA (mesmos do GA_MKP) ---
+        // --- Base GA parameters (same as GA_MKP) ---
         String path = cli.getOrDefault("path", "instances/mkp/mknapcb1.txt");
         int inst = getInt(cli, new String[]{"instance","inst"}, 1);
         int popSize = getInt(cli, new String[]{"pop","popSize"}, 100);
         double mut = getDouble(cli, new String[]{"mutation","mut"}, 0.02);
         boolean repair = getBool(cli, new String[]{"repair"}, true);
 
-        // lambda opcional
+        // optional lambda
         Double lambdaFixed = getNullableDouble(cli, new String[]{"lambda","lam","lmb"});
         problems.mkp.MKP_ORLib evaluator = (lambdaFixed != null)
                 ? new problems.mkp.MKP_ORLib(path, inst, lambdaFixed)
                 : new problems.mkp.MKP_ORLib(path, inst);
 
-        // --- parâmetros do ISGA ---
+        // --- ISGA parameters ---
         double alpha = getDouble(cli, new String[]{"alpha"}, 0.5);
         int kMale = getInt(cli, new String[]{"kMale","kmale"}, 6);
         int tournF = getInt(cli, new String[]{"tournF","tf","tF"}, 3);
@@ -175,7 +175,7 @@ public class ISGA_MKP extends GA_MKP {
 
         ISGA_MKP ga = new ISGA_MKP(evaluator, popSize, mut, repair, alpha, kMale, tournF, tournM);
 
-        // --- Tabu Search + Strategic Oscillation (opcional) ---
+        // --- Tabu Search + Strategic Oscillation (optional) ---
         boolean tsOn = getBool(cli, new String[]{"ts"}, false)
                 || hasAny(cli, "tenure","ts-steps","steps","vmin","vmax","lmbMin","lmbMax","up","down");
         if (tsOn) {
@@ -193,38 +193,38 @@ public class ISGA_MKP extends GA_MKP {
             ga.setImprover(ts);
         }
 
-        // === parâmetros de execução/registro (opcionais por CLI) ===
+        // === Execution/logging parameters (optional via CLI) ===
         String resultsDir = cli.getOrDefault("results-dir", "results");
         String algo = cli.getOrDefault("algo", ISGA_MKP.class.getSimpleName());
         String variant = cli.getOrDefault("variant", buildAutoVariant(mut, repair, tsOn, alpha, kMale, tournF, tournM, cli));
         long seed = Long.parseLong(cli.getOrDefault("seed", "0"));
-        String mkcbresPath = cli.get("mkcbres"); // pode vir por CLI; senão tentamos inferir abaixo
+        String mkcbresPath = cli.get("mkcbres"); // can be passed via CLI; otherwise we try to infer it below
 
-        // === dataset/fileTag e mkcbres ===
+        // === dataset/fileTag and mkcbres ===
         Path orlib = Paths.get(path);
         String fileTag = stripExt(orlib.getFileName().toString()); // "mknapcb3"
         String datasetId = "ORLIB";
 
         if (mkcbresPath == null) {
-            // tenta mkcbres ao lado do mknapcbX.txt; se não existir, usa "mkcbres.txt" na raiz
+            // try for mkcbres next to mknapcbX.txt; if it doesn't exist, use "mkcbres.txt" in the root
             Path guess = (orlib.getParent() != null)
                     ? orlib.getParent().resolve("mkcbres.txt")
                     : Paths.get("mkcbres.txt");
             mkcbresPath = Files.exists(guess) ? guess.toString() : "mkcbres.txt";
         }
 
-        // === ler BK e LP da referência e injetar no GA ===
+        // === read BK and LP from the reference and inject into GA ===
         double bk = Double.NaN, ublp = Double.NaN;
         try {
             Ref ref = readBKLP(mkcbresPath, fileTag, inst);
             if (ref != null) { bk = ref.bk; ublp = ref.ublp; }
         } catch (Exception ex) {
-            System.err.println("Aviso: falha ao ler mkcbres ("+mkcbresPath+"): " + ex.getMessage());
+            System.err.println("Warning: failed to read mkcbres ("+mkcbresPath+"): " + ex.getMessage());
         }
         ga.setBenchmark(bk, ublp);
         ga.setRunInfo(datasetId, fileTag, inst, algo, variant, seed);
 
-        // === preparar logger e delegar logging ao AbstractGA.solve() ===
+        // === prepare logger and delegate logging to AbstractGA.solve() ===
         Files.createDirectories(Paths.get(resultsDir));
         try (MetricsLogger logger = new MetricsLogger(
                 Paths.get(resultsDir, "results_runs.csv"),
@@ -237,28 +237,28 @@ public class ISGA_MKP extends GA_MKP {
     }
 
     protected static void printHelp() {
-        System.out.println("Uso (parâmetros nomeados em qualquer ordem):");
-        System.out.println("  --path <arquivo OR-Library>        (default: instances/mkp/mknapcb1.txt)");
+        System.out.println("Usage (named parameters in any order):");
+        System.out.println("  --path <OR-Library file>        (default: instances/mkp/mknapcb1.txt)");
         System.out.println("  --instance|--inst <id>             (default: 1)");
         System.out.println("  --pop|--popSize <n>                (default: 100)");
         System.out.println("  --mutation|--mut <p>               (default: 0.02)");
         System.out.println("  --repair <true/false>              (default: true)");
-        System.out.println("  --lambda|--lam|--lmb <val>         (opcional; se ausente, lambda automático)");
+        System.out.println("  --lambda|--lam|--lmb <val>         (optional; if absent, automatic lambda)");
         System.out.println();
         System.out.println("  --alpha <0..1>                     (default: 0.5)");
         System.out.println("  --kMale <n>                         (default: 6)");
         System.out.println("  --tournF|--tf <n>                  (default: 3)");
         System.out.println("  --tournM|--tm <n>                  (default: 2)");
         System.out.println();
-        System.out.println("  --ts <true/false>                  (ativa TS+SO; também ativa se qualquer parâmetro de TS for passado)");
+        System.out.println("  --ts <true/false>                  (activates TS+SO; also activates if any TS parameter is passed)");
         System.out.println("  --tenure <n>                       (default: 7)");
         System.out.println("  --ts-steps|--steps <n>             (default: 500)");
         System.out.println("  --vmin <val>                       (default: 0.0)");
         System.out.println("  --vmax <val>                       (default: 100.0)");
         System.out.println("  --lmbMin <val>                     (default: 0.1)");
         System.out.println("  --lmbMax <val>                     (default: 10000.0)");
-        System.out.println("  --up <fator>                       (default: 1.2)");
-        System.out.println("  --down <fator>                     (default: 0.9)");
+        System.out.println("  --up <factor>                       (default: 1.2)");
+        System.out.println("  --down <factor>                     (default: 0.9)");
     }
 
     private static String stripExt(String s) {
@@ -266,7 +266,7 @@ public class ISGA_MKP extends GA_MKP {
         return (dot >= 0) ? s.substring(0, dot) : s;
     }
 
-    /** Monta um 'variant' legível se não vier por CLI — útil nos CSVs. */
+    /** Assembles a readable 'variant' if not passed via CLI — useful for CSVs. */
     private static String buildAutoVariant(double mut, boolean repair, boolean tsOn,
                                            double alpha, int kMale, int tournF, int tournM,
                                            java.util.Map<String,String> cli) {
@@ -278,7 +278,7 @@ public class ISGA_MKP extends GA_MKP {
         sb.append(";tournF=").append(tournF);
         sb.append(";tournM=").append(tournM);
         sb.append(";ts=").append(tsOn);
-        // se TS estiver on, acrescenta alguns parâmetros relevantes (se existirem)
+        // if TS is on, add some relevant parameters (if they exist)
         if (tsOn) {
             if (cli.containsKey("tenure"))  sb.append(";tenure=").append(cli.get("tenure"));
             if (cli.containsKey("steps") || cli.containsKey("ts-steps"))
@@ -299,8 +299,8 @@ public class ISGA_MKP extends GA_MKP {
     }
 
     private static Ref readBKLP(String mkcbresPath, String fileTag, int idx) throws IOException {
-        // mknapcb1..9  ->  blocos: 5.100, 5.250, 5.500, 10.100, 10.250, 10.500, 30.100, 30.250, 30.500
-        // idx esperado: 1..30
+        // mknapcb1..9  ->  blocks: 5.100, 5.250, 5.500, 10.100, 10.250, 10.500, 30.100, 30.250, 30.500
+        // expected idx: 1..30
         int X = Integer.parseInt(fileTag.replaceAll("\\D+", "")); // "mknapcb3" -> 3
         int pos = (X - 1) * 30 + (idx - 1); // 0..269
 
@@ -309,7 +309,7 @@ public class ISGA_MKP extends GA_MKP {
 
         boolean inBK = false, inLP = false;
 
-        // Linha de dados: "5.500-12   217534"  ou  "5.500-12   2.1761579702e+05"
+        // Data line: "5.500-12   217534"  or  "5.500-12   2.1761579702e+05"
         java.util.regex.Pattern row = java.util.regex.Pattern.compile(
             "^(\\d+\\.\\d+-\\d{2})\\s+([0-9.+\\-Ee]+)\\s*$"
         );
@@ -320,14 +320,14 @@ public class ISGA_MKP extends GA_MKP {
                 ln = ln.trim();
                 if (ln.isEmpty()) continue;
 
-                // Detecta início de cada tabela
+                // Detects start of each table
                 if (ln.contains("Best Feasible Solution Value")) { inBK = true;  inLP = false; continue; }
                 if (ln.contains("LP optimal"))                  { inBK = false; inLP = true;  continue; }
 
                 java.util.regex.Matcher m = row.matcher(ln);
-                if (!m.matches()) continue; // ignora cabeçalhos e textos
+                if (!m.matches()) continue; // ignore headers and texts
 
-                // m.group(1) = "5.500-12" (não usamos para o 'pos' aqui)
+                // m.group(1) = "5.500-12" (we don't use it for 'pos' here)
                 double val = Double.parseDouble(m.group(2));
 
                 if (inBK) bests.add(val);
@@ -336,7 +336,7 @@ public class ISGA_MKP extends GA_MKP {
         }
 
         if (pos < 0 || pos >= bests.size() || pos >= lps.size()) {
-            throw new IOException("índice fora do mkcbres (pos=" + pos +
+            throw new IOException("index out of mkcbres bounds (pos=" + pos +
                                 "; BK=" + bests.size() + ", LP=" + lps.size() + ")");
         }
 

@@ -30,78 +30,88 @@ public abstract class AbstractGA<G extends Number, F> {
 	}
 
 	/**
-	 * flag that indicates whether the code should print more information on
-	 * screen
+	 * Flag that indicates whether the code should print more information on screen.
 	 */
 	public static boolean verbose = true;
 
 	/**
-	 * a random number generator
+	 * A random number generator.
 	 */
 	public static final Random rng = new Random(0);
 
 	/**
-	 * the objective function being optimized
+	 * The objective function being optimized.
 	 */
 	protected Evaluator<F> ObjFunction;
 
-	/** 
-	 * the size of the population 
+	/**
+	 * The size of the population.
 	 */
 	protected int popSize;
 
 	/**
-	 * the size of the chromosome
+	 * The size of the chromosome.
 	 */
 	protected int chromosomeSize;
 
 	/**
-	 * the probability of performing a mutation
+	 * The probability of performing a mutation.
 	 */
 	protected double mutationRate;
 
 	/**
-	 * the best solution cost
+	 * The best solution cost.
 	 */
 	protected Double bestCost;
 
 	/**
-	 * the best solution
+	 * The best solution.
 	 */
 	protected Solution<F> bestSol;
 
 	/**
-	 * the best chromosome, according to its fitness evaluation
+	 * The best chromosome, according to its fitness evaluation.
 	 */
 	protected Chromosome bestChromosome;
 
-	// Stopping criteria parameters
-
-	/** Tempo máximo de execução (nanos). Default: 30 minutos. */
+	/**
+	 * Maximum runtime in nanoseconds. Default: 30 minutes.
+	 */
 	protected long maxRuntimeNanos = TimeUnit.MINUTES.toNanos(30);
 
 	/**
-	 * Fator de estagnação: número máximo de iterações sem melhora = stagnationFactor * chromosomeSize.
+	 * Stagnation factor: maximum number of iterations without improvement = stagnationFactor * chromosomeSize.
 	 * Default: 10.
 	 */
 	protected int stagnationFactor = 10;
 
-	/** Setters opcionais para customização (se desejar) */
+	/**
+	 * Sets the maximum runtime in milliseconds.
+	 *
+	 * @param maxMillis
+	 *            The maximum runtime in milliseconds.
+	 */
 	public void setMaxRuntimeMillis(long maxMillis) {
 		this.maxRuntimeNanos = TimeUnit.MILLISECONDS.toNanos(maxMillis);
 	}
+	/**
+	 * Sets the stagnation factor.
+	 *
+	 * @param stagnationFactor
+	 *            The stagnation factor (minimum value is 1).
+	 */
 	public void setStagnationFactor(int stagnationFactor) {
 		if (stagnationFactor < 1) stagnationFactor = 1;
 		this.stagnationFactor = stagnationFactor;
 	}
 
 
-    /**
-     * Creates a new solution which is empty, i.e., does not contain any
-	 * candidate solution element.
-	 * 
-	 * @return An empty solution.
-	 */
+ /**
+  * Creates a new solution which is empty, i.e., does not contain any
+  * candidate solution element.
+  *
+  * @return An empty solution.
+  */
 	public abstract Solution<F> createEmptySol();
 
 	/**
@@ -162,15 +172,45 @@ public abstract class AbstractGA<G extends Number, F> {
 		this.mutationRate = mutationRate;
 	}
 
-	// ====== Metadados e métricas de execução ======
-	protected double bestKnown = Double.NaN;   // BK (melhor conhecido)
-	protected double ubLP = Double.NaN;        // limitante LP (superior)
-	protected String datasetId = "";           // ex.: "ORLIB"
-	protected String fileTag = "";             // ex.: "mknapcb3"
-	protected int instanceIdx = 0;             // ex.: 17
-	protected String algo = "GA";              // "GA","ISGA","KMeansGA", etc.
-	protected String variant = "";             // flags/TS etc. livre
-	protected long seed = 0L;                  // semente usada
+	/**
+	 * Best known solution value (BK).
+	 */
+	protected double bestKnown = Double.NaN;
+	
+	/**
+	 * Upper bound from LP relaxation.
+	 */
+	protected double ubLP = Double.NaN;
+	
+	/**
+	 * Dataset identifier (e.g., "ORLIB").
+	 */
+	protected String datasetId = "";
+	
+	/**
+	 * File tag (e.g., "mknapcb3").
+	 */
+	protected String fileTag = "";
+	
+	/**
+	 * Instance index (e.g., 17).
+	 */
+	protected int instanceIdx = 0;
+	
+	/**
+	 * Algorithm name (e.g., "GA", "ISGA", "KMeansGA").
+	 */
+	protected String algo = "GA";
+	
+	/**
+	 * Algorithm variant (e.g., flags, TS configuration).
+	 */
+	protected String variant = "";
+	
+	/**
+	 * Random seed used.
+	 */
+	protected long seed = 0L;
 
 	protected MetricsLogger metricsLogger;
 
@@ -182,31 +222,45 @@ public abstract class AbstractGA<G extends Number, F> {
 	}
 	public void setMetricsLogger(MetricsLogger logger) { this.metricsLogger = logger; }
 
-	// Converte um Chromosome<T extends Number> para vetor booleano (bit=gene!=0)
+	/**
+	 * Converts a chromosome to a boolean array (bit = gene != 0).
+	 *
+	 * @param c
+	 *            The chromosome to convert.
+	 * @return A boolean array representation of the chromosome.
+	 */
 	protected boolean[] toBool(Chromosome c) {
 		boolean[] b = new boolean[c.size()];
 		for (int i = 0; i < c.size(); i++) b[i] = c.get(i).intValue() != 0;
 		return b;
 	}
+	/**
+	 * Converts a population to a list of boolean arrays.
+	 *
+	 * @param pop
+	 *            The population to convert.
+	 * @return A list of boolean array representations.
+	 */
 	protected List<boolean[]> toBoolPop(Population pop) {
 		List<boolean[]> list = new java.util.ArrayList<>(pop.size());
 		for (Chromosome c : pop) list.add(toBool(c));
 		return list;
 	}
 	/**
-	 * GA mainframe with NEW stopping criteria:
-	 * - time limit (default 30 minutes), OR
-	 * - stagnation of (stagnationFactor * chromosomeSize) iterations without improvement.
-	 * It starts by initializing a population of chromosomes.
-	 * It then enters a generational loop, in which each generation goes the
-	 * following steps: parent selection, crossover, mutation, population update
+	 * GA mainframe with stopping criteria:
+	 * - Time limit (default 30 minutes), OR
+	 * - Stagnation of (stagnationFactor * chromosomeSize) iterations without improvement.
+	 *
+	 * The algorithm starts by initializing a population of chromosomes.
+	 * It then enters a generational loop, in which each generation performs the
+	 * following steps: parent selection, crossover, mutation, population update,
 	 * and best solution update.
-	 * 
+	 *
 	 * @return The best feasible solution obtained.
 	 */
 	public Solution<F> solve() {
 
-		/* starts the initial population */
+		// Initialize the population
 		Population population = initializePopulation();
 
 		bestChromosome = getBestChromosome(population);
@@ -219,11 +273,11 @@ public abstract class AbstractGA<G extends Number, F> {
 		int noImprovement = 0;
 		int g = 0;
 
-		// Acumuladores de diversidade (médias ao longo das gerações)
+		// Diversity accumulators (averages across generations)
 		double accDivHamming = 0.0, accDivEntropy = 0.0;
 		int accDivCount = 0;
 
-		// ---- LOG por geração (g=0) ----
+		// Log for generation 0
 		{
 			List<boolean[]> popBits = toBoolPop(population);
 			double divH = utils.Diversity.meanHammingToMedoid(popBits);
@@ -236,7 +290,7 @@ public abstract class AbstractGA<G extends Number, F> {
 			}
 		}
 
-		// === main loop ===
+		// Main generational loop
 		while (System.nanoTime() < deadline && noImprovement < stagnationLimit) {
 			g++;
 
@@ -258,7 +312,7 @@ public abstract class AbstractGA<G extends Number, F> {
 				noImprovement++;
 			}
 
-			// ---- Diversidade e log desta geração ----
+			// Diversity and logging for this generation
 			List<boolean[]> popBits = toBoolPop(population);
 			double divH = utils.Diversity.meanHammingToMedoid(popBits);
 			double divE = utils.Diversity.meanLocusEntropy(popBits);
@@ -282,7 +336,7 @@ public abstract class AbstractGA<G extends Number, F> {
 			System.out.println("Stopping criterion: " + stopReason + ".");
 		}
 
-		// === SUMÁRIO DA EXECUÇÃO (lucro e gaps) ===
+		// Execution summary (profit and gaps)
 		double f = bestSol.cost;
 		double gapLPpct = (Double.isFinite(ubLP) && ubLP > 0.0) ? 100.0 * (ubLP - f) / ubLP : Double.NaN;
 		double deltaBK = (Double.isFinite(bestKnown)) ? (f - bestKnown) : Double.NaN;
@@ -497,9 +551,14 @@ public abstract class AbstractGA<G extends Number, F> {
 	}
 
 	/**
-	 * Optional hook: allows subclasses to modify the population after selection/elitism
-	 * and before updating the generation's best solution (e.g., to run local search / TS).
-	 * Default is no-op.
+	 * Optional hook that allows subclasses to modify the population after selection/elitism
+	 * and before updating the generation's best solution (e.g., to run local search or TS).
+	 * Default implementation is no-op.
+	 *
+	 * @param population
+	 *            The current population.
+	 * @param generation
+	 *            The current generation number.
 	 */
 	protected void postGenerationHook(Population population, int generation) {
 		// no-op by default

@@ -4,14 +4,14 @@ import java.util.List;
 
 public final class Diversity {
 
-  /** Hamming normalizada [0,1] entre dois vetores binários */
+  /** Normalized Hamming distance [0,1] between two binary vectors. */
   public static double hamming01(boolean[] a, boolean[] b) {
     int d = 0;
     for (int i = 0; i < a.length; i++) if (a[i] != b[i]) d++;
     return d / (double) a.length;
   }
 
-  /** Hamming média ao medoide: O(n_pop^2) simples; para pop grande, amostre pares */
+  /** Mean Hamming distance to medoid: simple O(n_pop^2); for large populations, sample pairs. */
   public static double meanHammingToMedoid(List<boolean[]> pop) {
     int n = pop.size();
     double bestSum = Double.POSITIVE_INFINITY;
@@ -23,7 +23,7 @@ public final class Diversity {
     return bestSum / (n - 1);
   }
 
-  /** Entropia média por locus (normalizada por log(2)) */
+  /** Mean entropy per locus (normalized by log(2)). */
   public static double meanLocusEntropy(List<boolean[]> pop) {
     int n = pop.size(), L = pop.get(0).length;
     double acc = 0.0;
